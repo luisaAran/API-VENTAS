@@ -193,10 +193,45 @@ Obtiene la lista de todos los usuarios registrados (sin incluir contraseñas).
 
 ## 📦 Products Endpoints (`/api/products`)
 
+### 1. List Products
+Obtiene la lista de todos los productos disponibles. **Requiere autenticación** - usuarios y admins pueden ver productos.
+
+**Endpoint:** `GET /api/products`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Success Response (200):**
+```json
+[
+  {
+    "id": 1,
+    "name": "Laptop HP",
+    "description": "Laptop HP 15.6 pulgadas, 8GB RAM, 256GB SSD",
+    "price": 599.99,
+    "stock": 50
+  },
+  {
+    "id": 2,
+    "name": "Mouse Logitech",
+    "description": "Mouse inalámbrico Logitech MX Master 3",
+    "price": 99.99,
+    "stock": 150
+  }
+]
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `500 INTERNAL_ERROR`: Error al obtener productos
+
+---
+
 ### 2. Create Product
-Crea un nuevo producto en el catálogo.
+Crea un nuevo producto en el catálogo. **Requiere autenticación** - usuarios y admins pueden crear productos.
 
 **Endpoint:** `POST /api/products`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
 
 **Request Body:**
 ```json
@@ -226,38 +261,47 @@ Crea un nuevo producto en el catálogo.
 ```
 
 **Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
 - `400 VALIDATION_ERROR`: Datos del producto inválidos (ver reglas de validación)
 - `500 INTERNAL_ERROR`: Error al crear producto
 
 ---
 
-### 3. List Products
-Obtiene la lista de todos los productos disponibles.
+## 👥 Users Endpoints (`/api/users`)
 
-**Endpoint:** `GET /api/products`
+### 1. List Users
+Obtiene la lista de todos los usuarios registrados (sin incluir contraseñas). **Requiere autenticación de ADMIN** - solo administradores pueden ver la lista completa de usuarios.
+
+**Endpoint:** `GET /api/users`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos + rol `admin`.
 
 **Success Response (200):**
 ```json
 [
   {
     "id": 1,
-    "name": "Laptop HP",
-    "description": "Laptop HP 15.6 pulgadas, 8GB RAM, 256GB SSD",
-    "price": 599.99,
-    "stock": 50
+    "name": "Juan Pérez",
+    "email": "juan@example.com",
+    "balance": 1000,
+    "role": "user",
+    "emailVerified": true
   },
   {
     "id": 2,
-    "name": "Mouse Logitech",
-    "description": "Mouse inalámbrico Logitech MX Master 3",
-    "price": 99.99,
-    "stock": 150
+    "name": "María García",
+    "email": "maria@example.com",
+    "balance": 500,
+    "role": "admin",
+    "emailVerified": false
   }
 ]
 ```
 
 **Error Responses:**
-- `500 INTERNAL_ERROR`: Error al obtener productos
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `500 INTERNAL_ERROR`: Error al obtener usuarios
 
 ---
 
@@ -324,7 +368,7 @@ Los errores de validación (400 VALIDATION_ERROR) incluyen detalles específicos
 
 1. **Registro con Verificación de Email**: 
    - Usuario se registra → `POST /api/auth/register`
-   - Sistema crea cuenta y envía email con HTML + link de verificación
+   - Sistema crea cuenta (rol `user` por defecto) y envía email con HTML + link de verificación
    - Usuario recibe email con botón clickeable
    - Usuario hace click en link → `GET /api/auth/verify-email?token=xxx`
    - Email queda verificado
@@ -334,12 +378,31 @@ Los errores de validación (400 VALIDATION_ERROR) incluyen detalles específicos
    - Sistema valida que el email esté verificado
    - Usuario recibe código de 6 dígitos por email
    - Usuario envía código → `POST /api/auth/verify-code`
-   - Sistema genera tokens JWT en cookies
+   - Sistema genera tokens JWT en cookies (incluyen `userId`, `email`, `role`)
 
-3. **Refresh Token**:
-   - Cuando el access token expira (1 hora)
+3. **Acceso a Rutas Protegidas**:
+   - Cliente incluye automáticamente las cookies en cada request
+   - Middleware `requireAuth()` valida el `accessToken`
+   - **Si el `accessToken` está expirado**:
+     - Middleware verifica automáticamente el `refreshToken`
+     - Si es válido, genera nuevos tokens (rotación)
+     - Actualiza las cookies
+     - Continúa con el request original
+   - **Si ambos tokens son inválidos/expirados**:
+     - Retorna 401 y pide al usuario que haga login nuevamente
+
+4. **Refresh Manual** (opcional):
+   - Si el cliente detecta un token expirado
    - Cliente llama → `POST /api/auth/refresh`
    - Sistema genera nuevos tokens (rotación)
+
+### Renovación Automática de Tokens:
+
+El sistema implementa **auto-refresh transparente**:
+- Los endpoints protegidos con `requireAuth()` verifican ambos tokens
+- Si `accessToken` expiró pero `refreshToken` es válido, se renuevan ambos automáticamente
+- El cliente NO necesita manejar la renovación manualmente
+- Solo si ambos tokens expiran, se requiere login completo
 
 ---
 
@@ -349,13 +412,21 @@ La API utiliza cookies HTTP-only para almacenar tokens JWT:
 
 ### `accessToken`
 - **Duración**: 1 hora
+- **Contenido**: `{ userId, email, role, type: 'access' }`
 - **Uso**: Autenticación en cada request
 - **Flags**: `httpOnly`, `secure` (en producción), `sameSite: lax`
+- **Renovación**: Automática si `refreshToken` es válido
 
 ### `refreshToken`
 - **Duración**: 7 días
-- **Uso**: Refrescar el access token
+- **Contenido**: `{ userId, email, role, type: 'refresh' }`
+- **Uso**: Refrescar el access token automáticamente o manualmente
 - **Flags**: `httpOnly`, `secure` (en producción), `sameSite: lax`
+- **Rotación**: Se genera un nuevo refresh token en cada renovación
+
+### Roles disponibles:
+- `user`: Usuario regular (rol por defecto al registrarse)
+- `admin`: Administrador con permisos especiales
 
 ---
 

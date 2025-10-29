@@ -18,6 +18,9 @@ export class User {
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   balance!: number;
 
+  @Column({ type: 'enum', enum: ['user', 'admin'], default: 'user' })
+  role!: 'user' | 'admin';
+
   // Only store whether email is verified in the user model. Other tokens/codes
   // and refresh tokens are managed in the auth domain (in-memory or external store).
   @Column({ default: false })

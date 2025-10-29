@@ -155,15 +155,15 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
     if (!user) throw new NotFoundError('User');
 
-    // Generate access token (short-lived)
+    // Generate JWT tokens
     const accessToken = jwt.sign(
-      { userId: user.id, email: user.email, type: 'access' },
+      { userId: user.id, email: user.email, role: user.role, type: 'access' },
       appConfig.jwtSecret as jwt.Secret,
       { expiresIn: appConfig.jwtExpiresIn as jwt.SignOptions['expiresIn'] }
     );
     // Generate refresh token (long-lived, self-contained JWT)
     const refreshToken = jwt.sign(
-      { userId: user.id, email: user.email, type: 'refresh' },
+      { userId: user.id, email: user.email, role: user.role, type: 'refresh' },
       appConfig.jwtSecret as jwt.Secret,
       { expiresIn: `${appConfig.refreshTokenExpiresDays}d` }
     );
@@ -187,14 +187,14 @@ export class AuthService {
 
       // Generate new access token
       const accessToken = jwt.sign(
-        { userId: user.id, email: user.email, type: 'access' },
+        { userId: user.id, email: user.email, role: user.role, type: 'access' },
         appConfig.jwtSecret as jwt.Secret,
         { expiresIn: appConfig.jwtExpiresIn as jwt.SignOptions['expiresIn'] }
       );
 
       // Generate new refresh token (token rotation for better security)
       const newRefreshToken = jwt.sign(
-        { userId: user.id, email: user.email, type: 'refresh' },
+        { userId: user.id, email: user.email, role: user.role, type: 'refresh' },
         appConfig.jwtSecret as jwt.Secret,
         { expiresIn: `${appConfig.refreshTokenExpiresDays}d` }
       );

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { UsersController } from '../controllers/users.controller';
 import { UsersService } from '../services/users.service';
 import { asyncHandler } from '../../../shared/utils/asyncHandler';
+import { requireAuth } from '../../../shared/middlewares/auth';
 
 export class UsersRoutes {
   public readonly router: Router;
@@ -14,6 +15,11 @@ export class UsersRoutes {
   }
 
   private initializeRoutes() {
-    this.router.get('/', asyncHandler(this.controller.listUsers.bind(this.controller)));
+    // Protected route - only admins can list all users
+    this.router.get(
+      '/',
+      requireAuth(['admin']),
+      asyncHandler(this.controller.listUsers.bind(this.controller))
+    );
   }
 }
