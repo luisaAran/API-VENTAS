@@ -5,6 +5,7 @@ import { app } from './app';
 import { AppDataSource } from './data-source';
 import logger from './shared/utils/logger';
 import { createDefaultAdmin, getDefaultAdminCredentials } from './shared/config/seedAdmin';
+import { OrdersModule } from './domain/orders';
 
 const PORT = process.env.PORT || 3000;
 
@@ -13,6 +14,7 @@ AppDataSource.initialize()
     logger.info('✅ Data Source has been initialized successfully!');
     logger.info(`📊 Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
     await createDefaultAdmin();
+    await OrdersModule.service.cancelAllExpiredOrders();
     app.listen(PORT, () => {
       logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       logger.info(`🚀 Server listening on port ${PORT}`);

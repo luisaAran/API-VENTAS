@@ -3,13 +3,13 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; }
-      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
-      .code-box { background-color: #ffffff; border: 3px dashed #ff9900; padding: 25px; text-align: center; margin: 20px 0; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-      .code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ff9900; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #FFFFFF; margin: 0; padding: 0; background-color: #0F1111; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #0F1111; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #0F1111; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; box-shadow: 0 4px 8px rgba(255, 153, 0, 0.3); }
+      .content { background-color: #232F3E; padding: 30px; border-radius: 0 0 5px 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+      .code-box { background-color: #37475A; border: 3px dashed #ff9900; padding: 25px; text-align: center; margin: 20px 0; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+      .code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ff9900; text-shadow: 0 2px 4px rgba(255, 153, 0, 0.5); }
+      .footer { text-align: center; margin-top: 20px; color: #AAA; font-size: 12px; }
       .lock-icon { font-size: 48px; margin-bottom: 10px; }
       
       /* Responsive para móviles */
@@ -32,24 +32,24 @@
         <h1>Código de Verificación de Acceso</h1>
       </div>
       <div class="content">
-        <p>¡Hola <strong>{{name}}</strong>!</p>
-        <p>Tu código de verificación para iniciar sesión es:</p>
+        <p style="color: #FFFFFF;">¡Hola <strong style="color: #ff9900;">{{name}}</strong>!</p>
+        <p style="color: #DDD;">Tu código de verificación para iniciar sesión es:</p>
         <div class="code-box">
           <div class="code">{{code}}</div>
         </div>
-        <p style="font-size: 14px; color: #666; text-align: center;">
+        <p style="font-size: 14px; color: #AAA; text-align: center;">
           Ingresa este código en la página de verificación para completar tu inicio de sesión.
         </p>
-        <p style="margin-top: 30px; font-size: 14px; color: #666; background-color: #fff3cd; padding: 10px; border-radius: 5px; border-left: 4px solid #ff9900;">
-          ⏱️ Este código expirará en <strong>10 minutos</strong>.
+        <p style="margin-top: 30px; font-size: 14px; color: #FFD700; background-color: #3F4B59; padding: 15px; border-radius: 5px; border-left: 4px solid #ff9900;">
+          ⏱️ Este código expirará en <strong style="color: #ff9900;">10 minutos</strong>.
         </p>
-        <p style="font-size: 14px; color: #666;">
+        <p style="font-size: 14px; color: #AAA;">
           Si no intentaste iniciar sesión, por favor ignora este correo o contacta a soporte si estás preocupado/a por la seguridad de tu cuenta.
         </p>
       </div>
       <div class="footer">
-        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
-        <p style="margin-top: 10px; font-size: 11px;">Este correo es generado automáticamente. Por favor no responder.</p>
+        <p style="color: #AAA;">&copy; {{year}} <strong style="color: #ff9900;">API Ventas</strong>. Todos los derechos reservados.</p>
+        <p style="margin-top: 10px; font-size: 11px; color: #888;">Este correo es generado automáticamente. Por favor no responder.</p>
       </div>
     </div>
   </body>

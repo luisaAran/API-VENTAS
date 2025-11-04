@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Producto Agotado</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #0F1111;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #0F1111;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #232F3E; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #ff9900 0%, #ff7700 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="color: #0F1111; margin: 0; font-size: 28px; font-weight: bold; text-shadow: 0 1px 2px rgba(255,255,255,0.2);">
+                ⚠️ {{subject}}
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- Body Content -->
+          <tr>
+            <td style="background-color: #232F3E; padding: 40px 30px;">
+              
+              <!-- Greeting -->
+              <p style="color: #FFFFFF; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                Hola <strong style="color: #ff9900;">{{userName}}</strong>,
+              </p>
+              
+              <!-- Main Message -->
+              <p style="color: #DDD; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                {{message}}
+              </p>
+              
+              <!-- Products Table -->
+              <div style="background-color: #37475A; border-left: 4px solid #ff9900; padding: 20px; margin: 0 0 25px 0; border-radius: 4px;">
+                {{productsTable}}
+              </div>
+              
+              <!-- Action Taken -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #3F4B59; border-left: 4px solid #ff9900; margin: 0 0 25px 0;">
+                <tr>
+                  <td style="padding: 15px 20px;">
+                    <p style="margin: 0; color: #FFD700; font-size: 15px; line-height: 1.6;">
+                      ⚡ <strong>Acción automática:</strong> Los productos han sido eliminados de tu carrito de compras.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- Suggestion -->
+              <p style="color: #AAA; font-size: 15px; line-height: 1.6; margin: 0 0 30px 0; text-align: center;">
+                Te invitamos a explorar otros productos disponibles en nuestra tienda
+              </p>
+              
+              <!-- CTA Button -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 10px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{productsUrl}}" 
+                       style="display: inline-block; background-color: #ff9900; color: #0F1111; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 8px rgba(255, 153, 0, 0.4); transition: background-color 0.3s;">
+                      🛍️ Ver Productos Disponibles
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #0F1111; padding: 30px 20px; text-align: center; border-top: 1px solid #37475A;">
+              <p style="color: #AAA; font-size: 13px; margin: 0 0 8px 0; line-height: 1.5;">
+                <strong style="color: #ff9900;">API Ventas</strong> - Universidad
+              </p>
+              <p style="color: #888; font-size: 12px; margin: 0; line-height: 1.5;">
+                Este es un correo automático, por favor no respondas.<br>
+                Si tienes alguna pregunta, visita nuestra página de ayuda.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -3,18 +3,18 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; }
-      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #FFFFFF; margin: 0; padding: 0; background-color: #0F1111; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #0F1111; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #0F1111; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; box-shadow: 0 4px 8px rgba(255, 153, 0, 0.3); }
+      .content { background-color: #232F3E; padding: 30px; border-radius: 0 0 5px 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
       .thank-you { font-size: 18px; color: #ff9900; font-weight: bold; margin-bottom: 20px; }
-      .order-summary { background-color: #ffffff; padding: 20px; border-radius: 5px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .order-summary { background-color: #37475A; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border-left: 4px solid #ff9900; }
       .order-id { font-size: 24px; color: #ff9900; margin-bottom: 10px; font-weight: bold; }
-      .attachment-notice { background-color: #e3f2fd; border-left: 4px solid #146eb4; padding: 15px; margin: 20px 0; border-radius: 3px; }
-      .total-box { background: linear-gradient(135deg, #232F3E 0%, #000000 100%); color: #ffffff; padding: 20px; border-radius: 5px; margin-top: 20px; }
+      .attachment-notice { background-color: #3F4B59; border-left: 4px solid #146eb4; padding: 15px; margin: 20px 0; border-radius: 5px; color: #DDD; }
+      .total-box { background: linear-gradient(135deg, #1B2631 0%, #0F1111 100%); color: #ffffff; padding: 20px; border-radius: 8px; margin-top: 20px; border: 1px solid #ff9900; }
       .total { font-size: 22px; font-weight: bold; color: #ff9900; }
-      .balance { font-size: 14px; color: #ffffff; margin-top: 10px; }
-      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      .balance { font-size: 14px; color: #FFFFFF; margin-top: 10px; }
+      .footer { text-align: center; margin-top: 20px; color: #AAA; font-size: 12px; }
       .success-icon { font-size: 48px; margin-bottom: 10px; }
       
       /* Responsive para móviles */
@@ -37,31 +37,31 @@
         <h1>¡Gracias por tu Compra!</h1>
       </div>
       <div class="content">
-        <p class="thank-you">¡Hola {{name}}!</p>
-        <p>Tu orden ha sido completada exitosamente. ¡Gracias por confiar en nosotros!</p>
+        <p class="thank-you">¡Hola <span style="color: #FFFFFF;">{{name}}</span>!</p>
+        <p style="color: #DDD;">Tu orden ha sido completada exitosamente. ¡Gracias por confiar en nosotros!</p>
         
         <div class="order-summary">
           <div class="order-id">Orden #{{orderId}}</div>
-          <p><strong>Fecha:</strong> {{date}}</p>
-          <p><strong>Estado:</strong> <span style="color: #ff9900; font-weight: bold;">✓ Completada</span></p>
+          <p style="color: #DDD;"><strong style="color: #FFFFFF;">Fecha:</strong> {{date}}</p>
+          <p style="color: #DDD;"><strong style="color: #FFFFFF;">Estado:</strong> <span style="color: #ff9900; font-weight: bold;">✓ Completada</span></p>
           
           <div class="total-box">
             <div class="total">Total Pagado: ${{total}}</div>
-            <div class="balance">Tu saldo actual: ${{currentBalance}}</div>
+            <div class="balance">Tu saldo actual: <span style="color: #FFD700;">${{currentBalance}}</span></div>
           </div>
         </div>
         <div class="attachment-notice">
-          📎 <strong>Factura Adjunta</strong><br>
+          📎 <strong style="color: #FFFFFF;">Factura Adjunta</strong><br>
           Tu factura electrónica se encuentra adjunta a este correo.
           Consulta el archivo PDF para ver los detalles completos de tu compra.
         </div>
-        <p>Hemos generado la orden de envío para tus productos. Si tienes alguna duda sobre tu pedido, no dudes en contactar a nuestro equipo de soporte.</p>
-        <p style="margin-top: 30px;">¡Gracias por elegirnos!</p>
-        <p><strong>Equipo de Ventas</strong></p>
+        <p style="color: #DDD;">Hemos generado la orden de envío para tus productos. Si tienes alguna duda sobre tu pedido, no dudes en contactar a nuestro equipo de soporte.</p>
+        <p style="margin-top: 30px; color: #DDD;">¡Gracias por elegirnos!</p>
+        <p style="color: #FFFFFF;"><strong>Equipo de Ventas</strong></p>
       </div>
       <div class="footer">
-        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
-        <p style="margin-top: 10px; font-size: 11px;">Este correo es generado automáticamente. Por favor no responder.</p>
+        <p style="color: #AAA;">&copy; {{year}} <strong style="color: #ff9900;">API Ventas</strong>. Todos los derechos reservados.</p>
+        <p style="margin-top: 10px; font-size: 11px; color: #888;">Este correo es generado automáticamente. Por favor no responder.</p>
       </div>
     </div>
   </body>

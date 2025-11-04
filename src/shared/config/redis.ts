@@ -9,8 +9,17 @@ const REDIS_CONFIG = {
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: null,
 };
+
+export const redisConnection = {
+  host: REDIS_CONFIG.host,
+  port: REDIS_CONFIG.port,
+  password: REDIS_CONFIG.password,
+  db: REDIS_CONFIG.db,
+  maxRetriesPerRequest: null,
+};
+
 export const redisClient = new Redis(REDIS_CONFIG);
 redisClient.on('connect', () => {
   logger.info('🔴 Redis client connected');
@@ -31,4 +40,16 @@ process.on('SIGINT', async () => {
   await redisClient.quit();
   logger.info('👋 Redis client disconnected');
 });
+
+/**
+ * Get the initialized Redis client
+ * @returns Redis client instance
+ */
+export const getRedisClient = (): Redis => {
+  if (!redisClient) {
+    throw new Error('Redis client not initialized');
+  }
+  return redisClient;
+};
+
 export default redisClient;

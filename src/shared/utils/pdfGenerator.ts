@@ -1,12 +1,25 @@
 import PDFDocument from 'pdfkit';
 import { Order } from '../../domain/orders/models/Order';
 import fs from 'fs';
+import path from 'path';
+import logger from './logger';
 
 /**
  * PDF Generator using PDFKit
  * Generates professional invoice PDFs programmatically (no browser required)
  */
 export class PDFGenerator {
+  private static readonly LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
+  /**
+   * Check if logo file exists
+   */
+  private static hasLogo(): boolean {
+    try {
+      return fs.existsSync(this.LOGO_PATH);
+    } catch (error) {
+      return false;
+    }
+  }
   /**
    * Generate a PDF invoice from an order
    * @param order - The order to generate an invoice for
@@ -38,83 +51,108 @@ export class PDFGenerator {
         const lightGray = '#ECF0F1';
         const textGray = '#7F8C8D';
 
-        // Header - Company Name
+        // Header Layout: Logo on left, company info below logo, invoice info on right
+        const headerStartY = 45;
+        let logoHeight = 0;
+        
+        if (PDFGenerator.hasLogo()) {
+          try {
+            // Add logo (543x301 original → scaled to 150x83 for prominence)
+            const logoWidth = 150;
+            logoHeight = 83;
+            
+            doc.image(PDFGenerator.LOGO_PATH, 50, headerStartY, {
+              width: logoWidth,
+              height: logoHeight,
+            });
+            
+            logger.info('✅ Logo added to PDF invoice (150x83)');
+          } catch (error) {
+            logger.warn('⚠️  Failed to add logo to PDF, using text fallback:', error);
+          }
+        }
+        
+        // Company info below logo - left aligned
+        const companyInfoY = headerStartY + logoHeight + 10;
+        
+        // Company Name - left aligned, smaller
         doc
-          .fontSize(28)
+          .fontSize(16) // Reduced from 20
           .fillColor(primaryColor)
           .font('Helvetica-Bold')
-          .text('API Ventas', 50, 50);
+          .text('API Ventas', 50, companyInfoY);
 
+        // Company details - left aligned
         doc
-          .fontSize(10)
+          .fontSize(9)
           .fillColor(textGray)
           .font('Helvetica')
-          .text('Universidad Autónoma de Manizales', 50, 85)
-          .text('luisam.arangol@autonoma.edu.co | +57 300 123 4567', 50, 100);
+          .text('Universidad Autónoma de Manizales', 50, companyInfoY + 22)
+          .text('luisam.arangol@autonoma.edu.co', 50, companyInfoY + 36)
+          .text('+57 300 123 4567', 50, companyInfoY + 50);
 
-        // Invoice Title and Status
+        // Invoice Title and Info - right side, same level as logo
+        // Invoice Title (right side)
         doc
-          .fontSize(24)
+          .fontSize(22)
           .fillColor(primaryColor)
           .font('Helvetica-Bold')
-          .text(`FACTURA #${order.id}`, 350, 50, { align: 'right' });
+          .text(`FACTURA #${order.id}`, 350, headerStartY, { align: 'right' });
 
-        // Status Badge
+        // Status Badge (right side)
         const statusText = order.status === 'completed' ? 'PAGADO' : 'PENDIENTE';
         const statusColor = order.status === 'completed' ? accentColor : '#E74C3C';
         doc
-          .fontSize(12)
+          .fontSize(11)
           .fillColor(statusColor)
           .font('Helvetica-Bold')
-          .text(statusText, 350, 85, { align: 'right' });
+          .text(statusText, 350, headerStartY + 30, { align: 'right' });
 
-        // Date
+        // Date (right side)
         const orderDate = new Date(order.createdAt).toLocaleDateString('es-ES', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
         });
         doc
-          .fontSize(10)
+          .fontSize(9)
           .fillColor(textGray)
           .font('Helvetica')
-          .text(`Fecha: ${orderDate}`, 350, 105, { align: 'right' });
+          .text(`Fecha: ${orderDate}`, 350, headerStartY + 48, { align: 'right' });
 
-        // Separator line
+        // Separator line - below all header content
+        const separatorY = companyInfoY + 70; // After company details
         doc
           .strokeColor(lightGray)
           .lineWidth(2)
-          .moveTo(50, 140)
-          .lineTo(545, 140)
+          .moveTo(50, separatorY)
+          .lineTo(545, separatorY)
           .stroke();
 
         // Customer Information Section
+        const customerInfoY = separatorY + 20;
         doc
           .fontSize(12)
           .fillColor(primaryColor)
           .font('Helvetica-Bold')
-          .text('INFORMACIÓN DEL CLIENTE', 50, 160);
+          .text('INFORMACIÓN DEL CLIENTE', 50, customerInfoY);
 
         doc
           .fontSize(10)
           .fillColor(textGray)
           .font('Helvetica')
-          .text(`Nombre: ${order.user.name}`, 50, 185)
-          .text(`ID Cliente: #${order.user.id}`, 50, 200)
-          .text(`Email: ${order.user.email}`, 50, 215)
+          .text(`Nombre: ${order.user.name}`, 50, customerInfoY + 25)
+          .text(`ID Cliente: #${order.user.id}`, 50, customerInfoY + 40)
+          .text(`Email: ${order.user.email}`, 50, customerInfoY + 55);
 
-        // Items Table Header
-        const tableTop = 280;
+        // Items Table Section
+        const tableTop = customerInfoY + 95;
         doc
           .fontSize(12)
           .fillColor(primaryColor)
           .font('Helvetica-Bold')
-          .text('DETALLES DE LA COMPRA', 50, 260);
-
-        // Table header background
+          .text('DETALLES DE LA COMPRA', 50, tableTop - 20);
         doc.rect(50, tableTop, 495, 25).fill(lightGray);
-
-        // Table headers
         doc
           .fontSize(10)
           .fillColor(primaryColor)
@@ -124,12 +162,9 @@ export class PDFGenerator {
           .text('Cantidad', 300, tableTop + 8)
           .text('Precio Unit.', 380, tableTop + 8)
           .text('Total', 480, tableTop + 8);
-
-        // Table rows
         let yPosition = tableTop + 35;
         order.items.forEach((item, index) => {
           const itemTotal = item.unitPrice * item.quantity;
-
           doc
             .fontSize(10)
             .fillColor(textGray)
@@ -139,8 +174,6 @@ export class PDFGenerator {
             .text(`${item.quantity}`, 300, yPosition)
             .text(`$${item.unitPrice.toFixed(2)}`, 380, yPosition)
             .text(`$${itemTotal.toFixed(2)}`, 480, yPosition);
-
-          // Row separator
           yPosition += 30;
           doc
             .strokeColor(lightGray)
@@ -149,18 +182,14 @@ export class PDFGenerator {
             .lineTo(545, yPosition - 5)
             .stroke();
         });
-
-        // Totals Section
         yPosition += 20;
         const totalsX = 380;
-
         doc
           .fontSize(10)
           .fillColor(textGray)
           .font('Helvetica')
           .text('Subtotal:', totalsX, yPosition)
           .text(`$${order.total.toFixed(2)}`, 480, yPosition);
-
         yPosition += 20;
         doc
           .fontSize(12)
@@ -168,8 +197,6 @@ export class PDFGenerator {
           .font('Helvetica-Bold')
           .text('TOTAL:', totalsX, yPosition)
           .text(`$${order.total.toFixed(2)}`, 480, yPosition);
-
-        // Footer - Thank you message
         doc
           .fontSize(10)
           .fillColor(accentColor)
@@ -178,7 +205,6 @@ export class PDFGenerator {
             align: 'center',
             width: 495,
           });
-
         doc
           .fontSize(8)
           .fillColor(textGray)
@@ -192,7 +218,6 @@ export class PDFGenerator {
               width: 495,
             }
           );
-
         doc
           .fontSize(8)
           .fillColor(textGray)
@@ -200,15 +225,12 @@ export class PDFGenerator {
             align: 'center',
             width: 495,
           });
-
-        // Finalize PDF
         doc.end();
       } catch (error) {
         reject(error);
       }
     });
   }
-
   /**
    * Save invoice PDF to file system
    * @param order - The order to generate an invoice for

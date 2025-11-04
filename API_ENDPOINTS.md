@@ -1126,6 +1126,437 @@ Permite a un usuario cancelar su propia orden en estado pendiente. Solo se puede
 
 ---
 
+## � Cart Endpoints (`/api/cart`)
+
+### 1. Get Cart
+Obtiene el carrito de compras del usuario autenticado. Retorna un carrito vacío si no existe.
+
+**Endpoint:** `GET /api/cart`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Success Response - Cart with Items (200):**
+```json
+{
+  "userId": 1,
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2,
+      "addedAt": "2025-11-04T10:30:00.000Z"
+    },
+    {
+      "productId": 3,
+      "quantity": 1,
+      "addedAt": "2025-11-04T11:00:00.000Z"
+    }
+  ],
+  "updatedAt": "2025-11-04T11:00:00.000Z"
+}
+```
+
+**Success Response - Empty Cart (200):**
+```json
+{
+  "userId": 1,
+  "items": [],
+  "updatedAt": "2025-11-04T10:00:00.000Z"
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `500 INTERNAL_ERROR`: Error al obtener carrito
+
+**Notes:**
+- El carrito se almacena en Redis con TTL de 7 días
+- Si no existe carrito, retorna un carrito vacío (no es error)
+- El carrito expira automáticamente después de 7 días de inactividad
+
+---
+
+### 2. Get Cart Summary
+Obtiene el carrito con detalles completos de productos, precios, subtotales y total. Ideal para mostrar en la UI antes del checkout.
+
+**Endpoint:** `GET /api/cart/summary`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Success Response (200):**
+```json
+{
+  "userId": 1,
+  "items": [
+    {
+      "productId": 1,
+      "productName": "Laptop HP",
+      "productPrice": 599.99,
+      "productStock": 50,
+      "quantity": 2,
+      "subtotal": 1199.98,
+      "addedAt": "2025-11-04T10:30:00.000Z"
+    },
+    {
+      "productId": 3,
+      "productName": "Mouse Logitech",
+      "productPrice": 99.99,
+      "productStock": 150,
+      "quantity": 1,
+      "subtotal": 99.99,
+      "addedAt": "2025-11-04T11:00:00.000Z"
+    }
+  ],
+  "total": 1299.97,
+  "itemCount": 3,
+  "updatedAt": "2025-11-04T11:00:00.000Z"
+}
+```
+
+**Success Response - Empty Cart (200):**
+```json
+{
+  "userId": 1,
+  "items": [],
+  "total": 0,
+  "itemCount": 0,
+  "updatedAt": "2025-11-04T10:00:00.000Z"
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `404 NOT_FOUND`: Uno o más productos en el carrito ya no existen
+- `500 INTERNAL_ERROR`: Error al obtener resumen del carrito
+
+**Notes:**
+- Obtiene información actualizada de productos desde la base de datos
+- Calcula subtotales por item y total general
+- `itemCount` es la suma de cantidades de todos los items
+- Si un producto fue eliminado, se lanza error 404
+
+---
+
+### 3. Add Item to Cart
+Agrega un producto al carrito o incrementa su cantidad si ya existe. Valida stock disponible.
+
+**Endpoint:** `POST /api/cart/items`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Request Body:**
+```json
+{
+  "productId": 1,
+  "quantity": 2
+}
+```
+
+**Validation Rules:**
+- `productId`: Número entero positivo, requerido
+- `quantity`: Número entero positivo, requerido
+
+**Success Response (201):**
+```json
+{
+  "message": "Item added to cart",
+  "cart": {
+    "userId": 1,
+    "items": [
+      {
+        "productId": 1,
+        "quantity": 2,
+        "addedAt": "2025-11-04T10:30:00.000Z"
+      }
+    ],
+    "updatedAt": "2025-11-04T10:30:00.000Z"
+  }
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: productId o quantity inválidos
+- `404 NOT_FOUND`: Producto no encontrado
+- `400 VALIDATION_ERROR`: Stock insuficiente
+- `500 INTERNAL_ERROR`: Error al agregar item
+
+**Notes:**
+- Si el producto ya existe en el carrito, incrementa la cantidad existente
+- Valida que haya stock suficiente antes de agregar
+- El carrito se guarda en Redis con TTL de 7 días
+- Cada vez que se modifica el carrito, el TTL se reinicia
+
+---
+
+### 4. Update Item Quantity
+Actualiza la cantidad de un producto en el carrito. **Reemplaza** la cantidad existente (no suma).
+
+**Endpoint:** `PUT /api/cart/items`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Request Body:**
+```json
+{
+  "productId": 1,
+  "quantity": 3
+}
+```
+
+**Validation Rules:**
+- `productId`: Número entero positivo, requerido
+- `quantity`: Número entero positivo, requerido
+
+**Success Response (200):**
+```json
+{
+  "message": "Item quantity updated",
+  "cart": {
+    "userId": 1,
+    "items": [
+      {
+        "productId": 1,
+        "quantity": 3,
+        "addedAt": "2025-11-04T10:30:00.000Z"
+      }
+    ],
+    "updatedAt": "2025-11-04T12:00:00.000Z"
+  }
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: productId o quantity inválidos
+- `404 NOT_FOUND`: Producto no encontrado o no está en el carrito
+- `400 VALIDATION_ERROR`: Stock insuficiente
+- `500 INTERNAL_ERROR`: Error al actualizar item
+
+**Notes:**
+- **Importante**: Este endpoint REEMPLAZA la cantidad, no la suma
+- Si quieres incrementar, usa `POST /api/cart/items`
+- Valida stock disponible antes de actualizar
+- Si el producto no está en el carrito, retorna error 404
+
+---
+
+### 5. Remove Item from Cart
+Elimina un producto del carrito. Si era el único item, elimina todo el carrito de Redis.
+
+**Endpoint:** `DELETE /api/cart/items`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Request Body:**
+```json
+{
+  "productId": 1
+}
+```
+
+**Validation Rules:**
+- `productId`: Número entero positivo, requerido
+
+**Success Response (200):**
+```json
+{
+  "message": "Item removed from cart",
+  "cart": {
+    "userId": 1,
+    "items": [
+      {
+        "productId": 3,
+        "quantity": 1,
+        "addedAt": "2025-11-04T11:00:00.000Z"
+      }
+    ],
+    "updatedAt": "2025-11-04T12:30:00.000Z"
+  }
+}
+```
+
+**Success Response - Last Item Removed (200):**
+```json
+{
+  "message": "Item removed from cart. Cart is now empty.",
+  "cart": {
+    "userId": 1,
+    "items": [],
+    "updatedAt": "2025-11-04T12:30:00.000Z"
+  }
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: productId inválido
+- `404 NOT_FOUND`: Producto no está en el carrito
+- `500 INTERNAL_ERROR`: Error al eliminar item
+
+**Notes:**
+- Si era el último producto, el carrito se elimina completamente de Redis
+- Retorna el carrito actualizado después de eliminar
+- Si el carrito queda vacío, el mensaje indica que está vacío
+
+---
+
+### 6. Clear Cart
+Elimina completamente el carrito del usuario de Redis.
+
+**Endpoint:** `DELETE /api/cart`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Success Response (200):**
+```json
+{
+  "message": "Cart cleared successfully"
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `500 INTERNAL_ERROR`: Error al limpiar carrito
+
+**Notes:**
+- Elimina el carrito completo de Redis
+- Si no existía carrito, retorna éxito de todas formas
+- Útil para "vaciar carrito" o después de checkout manual
+
+---
+
+### 7. Checkout
+Convierte el carrito en una orden de compra. Valida stock y balance, crea la orden usando el servicio de órdenes, y limpia el carrito después del éxito.
+
+**Endpoint:** `POST /api/cart/checkout`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`. Opcionalmente cookie `trustedPayment` para auto-aprobar.
+
+**Request Body:**
+No requiere body, usa el carrito actual del usuario.
+
+**Success Response - Dispositivo Confiable (201):**
+Si el usuario tiene cookie `trustedPayment` válida:
+```json
+{
+  "message": "Order created successfully",
+  "order": {
+    "id": 123,
+    "createdAt": "2025-11-04T12:00:00.000Z",
+    "total": 1299.97,
+    "status": "completed",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com"
+    },
+    "items": [
+      {
+        "id": 1,
+        "quantity": 2,
+        "unitPrice": 599.99,
+        "product": {
+          "id": 1,
+          "name": "Laptop HP",
+          "price": 599.99,
+          "stock": 48
+        }
+      }
+    ]
+  },
+  "requiresVerification": false
+}
+```
+
+**Success Response - Requiere Verificación (201):**
+Si NO tiene cookie `trustedPayment`:
+```json
+{
+  "message": "Order created. Please check your email to verify payment within 5 minutes.",
+  "order": {
+    "id": 123,
+    "createdAt": "2025-11-04T12:00:00.000Z",
+    "total": 1299.97,
+    "status": "pending",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com"
+    },
+    "items": [...]
+  },
+  "requiresVerification": true
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: Carrito vacío
+- `404 NOT_FOUND`: Producto en carrito no encontrado
+- `400 VALIDATION_ERROR`: Stock insuficiente para uno o más productos
+- `400 VALIDATION_ERROR`: Balance insuficiente
+- `400 VALIDATION_ERROR`: Usuario tiene 5 órdenes pendientes (máximo alcanzado)
+- `500 INTERNAL_ERROR`: Error al crear orden
+
+**Notes:**
+- Convierte items del carrito al formato de OrdersService
+- Valida stock y balance antes de crear la orden
+- **Con `trustedPayment` cookie**: Pago instantáneo, orden `completed`, balance/stock descontados inmediatamente
+- **Sin `trustedPayment` cookie**: Orden `pending`, envía email de verificación, expira en 5 minutos
+- Después de crear la orden exitosamente, el carrito se limpia automáticamente
+- Si la creación de orden falla, el carrito se mantiene intacto
+- Ver documentación de `POST /api/orders` para más detalles sobre el flujo de verificación
+
+---
+
+## �📊 Bull Board Dashboard (Admin Only)
+
+### Queue Monitoring Dashboard
+Dashboard web para monitorear las colas de jobs en tiempo real. Permite inspeccionar, gestionar y hacer retry de jobs.
+
+**Endpoint:** `GET /admin/queues`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `admin`.
+
+**Features:**
+- 📊 Vista en tiempo real de todas las colas
+- 🔍 Inspección detallada de jobs
+- 🔄 Retry manual de jobs fallidos
+- 🗑️ Limpieza de jobs antiguos
+- 📈 Estadísticas y métricas
+- ⏱️ Timeline de jobs delayed
+
+**Colas Disponibles:**
+- `order-expiration`: Jobs para cancelación automática de órdenes pendientes
+
+**Acceso:**
+1. Iniciar sesión como admin mediante `/api/auth/login`
+2. Navegar a `http://localhost:3000/admin/queues` en el navegador
+3. Ver y gestionar todas las colas activas
+
+**UI Sections:**
+- **Queues**: Lista de todas las colas con contadores
+- **Jobs**: Vista de jobs por estado (active, waiting, delayed, completed, failed)
+- **Job Details**: Información completa del job (data, logs, stack trace)
+- **Actions**: Retry, Delete, Promote, Clean
+
+**Security:**
+- ✅ Autenticación JWT requerida
+- ✅ Solo usuarios con rol `admin`
+- ⚠️ En producción, considerar protección adicional (Basic Auth, IP Whitelist, VPN)
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+
+**Notes:**
+- El dashboard es una SPA (Single Page Application) servida por Bull Board
+- Actualizaciones en tiempo real mediante polling
+- Útil para debugging y monitoreo de jobs
+- Ver [JOB_QUEUES.md](./JOB_QUEUES.md) para más información sobre las colas
+
+---
+
 ## 🏠 Health Check
 
 ### Root Endpoint

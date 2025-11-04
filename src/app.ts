@@ -5,11 +5,21 @@ import { AuthModule, setOrdersService } from './domain/auth';
 import { UsersModule, setAuthService } from './domain/users';
 import { ProductsModule } from './domain/products';
 import { OrdersModule } from './domain/orders';
+import { CartModule } from './domain/cart';
 import { errorHandler } from './shared/middlewares/errorHandler';
 import { requestLogger, logRequestBody, errorLogger } from './shared/middlewares/logger';
+import { initOrderExpirationWorker } from './shared/queues/orderExpiration.queue';
+import { initEmailWorker } from './shared/queues/email.queue';
+import { initCartCleanupWorker } from './shared/queues/cartCleanup.queue';
+import { bullBoardRouter } from './shared/config/bullBoard';
 
 // Inject OrdersService into AuthService to avoid circular dependency
 setOrdersService(OrdersModule.service);
+
+// Initialize workers
+initOrderExpirationWorker(OrdersModule.service);
+initEmailWorker();
+initCartCleanupWorker(CartModule.repository, ProductsModule.service, UsersModule.service);
 
 // Inject AuthService into UsersModule to avoid circular dependency
 setAuthService(AuthModule.service);
@@ -27,6 +37,8 @@ app.use('/api/auth', AuthModule.router);
 app.use('/api/users', UsersModule.router);
 app.use('/api/products', ProductsModule.router);
 app.use('/api/orders', OrdersModule.router);
+app.use('/api/cart', CartModule.router);
+app.use('/admin/queues', bullBoardRouter);
 app.get('/', (req, res) => res.json({ ok: true, msg: 'Ventas API' }));
 
 // Error handling middlewares (MUST be after routes)
