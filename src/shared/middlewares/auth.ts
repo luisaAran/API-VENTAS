@@ -13,6 +13,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: JwtPayload;
+      hasTrustedPayment?: boolean;
     }
   }
 }
@@ -101,4 +102,41 @@ export const requireAuth = (roles?: Array<'admin' | 'user'>) => {
       next(error);
     }
   };
+};
+
+/**
+ * Middleware that checks if the user has a valid trustedPayment cookie.
+ * This is an optional middleware that can be chained after requireAuth.
+ * It sets req.hasTrustedPayment = true if the cookie is valid, false otherwise.
+ * 
+ * Usage:
+ * router.post('/checkout', requireAuth(), checkTrustedPayment, controller.checkout)
+ */
+export const checkTrustedPayment = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const trustedPaymentToken = req.cookies?.trustedPayment;
+    if (!trustedPaymentToken) {
+      req.hasTrustedPayment = false;
+      return next();
+    }
+    try {
+      const decoded = jwt.verify(trustedPaymentToken, appConfig.jwtSecret) as any; 
+      if (decoded.purpose !== 'trusted-payment' || !decoded.userId) {
+        req.hasTrustedPayment = false;
+        return next();
+      }
+      if (req.user && decoded.userId !== req.user.userId) {
+        req.hasTrustedPayment = false;
+        return next();
+      }
+      req.hasTrustedPayment = true;
+      return next();
+    } catch (err: any) {
+      req.hasTrustedPayment = false;
+      return next();
+    }
+  } catch (error) {
+    req.hasTrustedPayment = false;
+    return next();
+  }
 };

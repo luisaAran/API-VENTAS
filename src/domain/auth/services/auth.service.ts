@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config as appConfig } from '../../../shared/config';
-import { sendMail } from '../../../shared/utils/mailer';
+import { queueEmail } from '../../../shared/queues/email.queue';
 import { UsersService } from '../../users/services/users.service';
 import { NotFoundError, AuthenticationError, ValidationError } from '../../../shared/errors';
 import type { OrdersService } from '../../orders/services/orders.service';
@@ -36,12 +36,12 @@ export class AuthService {
     // Generate email from template
     const html = EmailTemplates.emailVerification(name, verificationLink);
     
-    await sendMail(
-      email, 
-      'Welcome to Ventas - Verify your email', 
-      html, 
-      `Welcome to Ventas! Please verify your email by clicking this link: ${verificationLink}`
-    );
+    await queueEmail({
+      to: email,
+      subject: 'Welcome to Ventas - Verify your email',
+      html,
+      text: `Welcome to Ventas! Please verify your email by clicking this link: ${verificationLink}`,
+    });
     return { 
       ok: true, 
       message: 'Registration successful. Please check your email to verify your account.',
@@ -63,7 +63,12 @@ export class AuthService {
     // Generate email from template
     const html = EmailTemplates.emailVerification(user.name, verificationLink);
     
-    await sendMail(user.email, 'Email verification - Ventas', html, `Verification link: ${verificationLink}`);
+    await queueEmail({
+      to: user.email,
+      subject: 'Email verification - Ventas',
+      html,
+      text: `Verification link: ${verificationLink}`,
+    });
     return { ok: true };
   }
 
@@ -155,7 +160,12 @@ export class AuthService {
     // Generate email from template
     const html = EmailTemplates.loginCode(user.name, code);
     
-    await sendMail(user.email, 'Your login code - Ventas', html, `Your login code is: ${code}`);
+    await queueEmail({
+      to: user.email,
+      subject: 'Your login code - Ventas',
+      html,
+      text: `Your login code is: ${code}`,
+    });
     
     return { ok: true, skipTwoFactor: false, pendingAuthToken };
   }

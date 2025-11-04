@@ -10,12 +10,45 @@ import { sendMail } from '../../../shared/utils/mailer';
 import { EmailTemplates } from '../../../shared/templates';
 import { PDFGenerator } from '../../../shared/utils/pdfGenerator';
 import logger from '../../../shared/utils/logger';
+import { scheduleOrderExpiration, cancelOrderExpirationJob } from '../../../shared/queues/orderExpiration.queue';
+import { queueEmail } from '../../../shared/queues/email.queue';
+import { queueCartCleanup } from '../../../shared/queues/cartCleanup.queue';
 
 export class OrdersService {
   constructor(
     private orderRepository: OrderRepository,
     private usersService: UsersService
   ) {}
+
+  /**
+   * Check if any products ran out of stock and queue cart cleanup
+   * @private
+   */
+  private async checkAndCleanupOutOfStockProducts(
+    products: Product[],
+    orderId?: number
+  ): Promise<void> {
+    const outOfStockProducts = products.filter(product => product.stock === 0);
+    
+    if (outOfStockProducts.length > 0) {
+      logger.info(
+        `Found ${outOfStockProducts.length} products out of stock, queuing cart cleanup...`
+      );
+      try {
+        const productsToCleanup = outOfStockProducts.map(product => ({
+          productId: product.id,
+          productName: product.name,
+        }));
+        const jobId = await queueCartCleanup(productsToCleanup, orderId);
+        const productNames = outOfStockProducts.map(p => p.name).join(', ');
+        logger.info(
+          `Cart cleanup queued [${jobId}] for ${outOfStockProducts.length} product(s): ${productNames}${orderId ? ` (Order #${orderId})` : ''}`
+        );
+      } catch (error) {
+        logger.error('Failed to queue cart cleanup:', error);
+      }
+    }
+  }
   async createOrder(
     userId: number,
     items: Array<{ productId: number; quantity: number }>,
@@ -71,19 +104,26 @@ export class OrdersService {
     }
     if (hasTrustedPayment) {
       await this.usersService.deductBalance(userId, total);
-      Array.from(productMap.values()).forEach(product => {
+      const productsArray = Array.from(productMap.values());
+      productsArray.forEach(product => {
         const item = items.find(i => i.productId === product.id);
         if (item) {
           product.stock -= item.quantity;
         }
       });
-      await this.orderRepository.saveProducts(Array.from(productMap.values()));
+      
+      await this.orderRepository.saveProducts(productsArray);
+      
       const order = await this.orderRepository.createOrder({
         user: { id: userId } as any,
         items: orderItems,
         total,
         status: 'completed',
       });
+      
+      // Queue cart cleanup with order ID
+      await this.checkAndCleanupOutOfStockProducts(productsArray, order.id);
+      
       const createdOrder = await this.orderRepository.findOrderById(order.id);
       return { order: createdOrder, requiresVerification: false };
     }
@@ -122,13 +162,13 @@ export class OrdersService {
       verificationLinkWithRemember
     );
 
-    await sendMail(
-      user.email,
-      `Verificar pago`,
+    await queueEmail({
+      to: user.email,
+      subject: 'Verificar pago',
       html,
-      `Por favor verifica tu pago para la orden #${order.id}. Link: ${verificationLink}`
-    );
-
+      text: `Por favor verifica tu pago para la orden #${order.id}. Link: ${verificationLink}`,
+    });
+    await scheduleOrderExpiration(order.id, userId, order.createdAt);
     const createdOrder = await this.orderRepository.findOrderById(order.id);
     return { 
       order: createdOrder, 
@@ -209,13 +249,15 @@ export class OrdersService {
       }
     });
 
-    await this.orderRepository.saveProducts(Array.from(productMap.values()));
-
-    // Mark order as completed
+    const productsArray = Array.from(productMap.values());
+    await this.orderRepository.saveProducts(productsArray);
+    
+    // Queue cart cleanup with order ID
+    await this.checkAndCleanupOutOfStockProducts(productsArray, orderId);
+    
+    await cancelOrderExpirationJob(orderId);
     order.status = 'completed';
     await this.orderRepository.saveOrder(order);
-
-    // Get updated user data with current balance
     const updatedUser = await this.usersService.findById(userId);
     if (!updatedUser) {
       throw new NotFoundError('User');
@@ -239,22 +281,22 @@ export class OrdersService {
         updatedUser.balance.toFixed(2)
       );
 
-      // Send email with PDF attachment
-      await sendMail(
-        order.user.email,
-        `¡Gracias por tu compra! - Orden #${order.id}`,
+      // Queue email with PDF attachment
+      await queueEmail({
+        to: order.user.email,
+        subject: `¡Gracias por tu compra! - Orden #${order.id}`,
         html,
-        `Gracias por tu compra. Tu orden #${order.id} ha sido completada exitosamente.`,
-        [
+        text: `Gracias por tu compra. Tu orden #${order.id} ha sido completada exitosamente.`,
+        attachments: [
           {
             filename: `Factura-${order.id}.pdf`,
             content: pdfBuffer,
             contentType: 'application/pdf',
           },
-        ]
-      );
+        ],
+      });
 
-      logger.info(`Invoice PDF sent to ${order.user.email} for order #${order.id}`);
+      logger.info(`Invoice email queued for ${order.user.email} for order #${order.id}`);
     } catch (emailError) {
       // Log error but don't fail the order completion
       logger.error(`Failed to send invoice email for order #${order.id}:`, emailError);
@@ -269,12 +311,64 @@ export class OrdersService {
 
   /**
    * Cancel order if verification expired
+   * Used by the queue worker to automatically cancel expired orders
    */
   async cancelOrder(orderId: number) {
     const order = await this.orderRepository.findOrderById(orderId);
     if (order && order.status === 'pending') {
-      order.status = 'cancelled';
-      await this.orderRepository.saveOrder(order);
+      // Validate expiration time (5 minutes)
+      const orderCreatedAt = new Date(order.createdAt);
+      const now = new Date();
+      const minutesPassed = (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60);
+
+      if (minutesPassed >= 5) {
+        order.status = 'cancelled';
+        order.cancelledAt = now;
+        await this.orderRepository.saveOrder(order);
+        logger.info(`Order #${orderId} automatically cancelled after ${minutesPassed.toFixed(2)} minutes`);
+      }
+    }
+  }
+
+  /**
+   * Cancel all expired pending orders
+   * Used on application startup to clean up any orders that expired while the app was down
+   */
+  async cancelAllExpiredOrders() {
+    try {
+      logger.info('🔍 Checking for expired pending orders...');
+      const pendingOrders = await this.orderRepository.findAllOrdersWithFilters({
+        status: 'pending',
+      });
+      if (!pendingOrders || pendingOrders.length === 0) {
+        logger.info('✅ No pending orders found');
+        return { cancelledCount: 0, orders: [] };
+      }
+      const now = new Date();
+      const expiredOrders: Order[] = [];
+      for (const order of pendingOrders) {
+        const orderCreatedAt = new Date(order.createdAt);
+        const minutesPassed = (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60);
+        if (minutesPassed >= 5) {
+          order.status = 'cancelled';
+          order.cancelledAt = now;
+          await this.orderRepository.saveOrder(order);
+          expiredOrders.push(order);
+          logger.info(`📦 Order #${order.id} cancelled (expired ${minutesPassed.toFixed(2)} minutes ago)`);
+        }
+      }
+      if (expiredOrders.length > 0) {
+        logger.info(`✅ Cancelled ${expiredOrders.length} expired order(s)`);
+      } else {
+        logger.info('✅ All pending orders are still valid');
+      }
+      return {
+        cancelledCount: expiredOrders.length,
+        orders: expiredOrders,
+      };
+    } catch (error) {
+      logger.error('❌ Error cancelling expired orders:', error);
+      throw error;
     }
   }
   /**
@@ -294,7 +388,9 @@ export class OrdersService {
         `No se puede cancelar esta orden. Estado actual: ${order.status === 'completed' ? 'completada' : 'cancelada'}`
       );
     }
+    await cancelOrderExpirationJob(orderId);
     order.status = 'cancelled';
+    order.cancelledAt = new Date();
     await this.orderRepository.saveOrder(order);
     return {
       message: 'Orden cancelada exitosamente',
@@ -384,7 +480,6 @@ export class OrdersService {
     // 1. Fetch all products CONCURRENTLY to restore stock
     const productIds = order.items.map(item => item.product.id);
     const products = await this.orderRepository.findProductsByIds(productIds);
-
     // 2. Restore product stock
     const productMap = new Map<number, Product>();
     products.forEach((product, index) => {
@@ -399,9 +494,7 @@ export class OrdersService {
 
     // 3. Save all restored stock CONCURRENTLY
     await this.orderRepository.saveProducts(Array.from(productMap.values()));
-
     await this.orderRepository.removeOrder(order);
-
     return { ok: true, message: 'Order deleted successfully and stock restored' };
   }
 }

@@ -3,26 +3,26 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
-      .order-details { background-color: #ffffff; padding: 20px; border-radius: 5px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #FFFFFF; margin: 0; padding: 0; background-color: #0F1111; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #0F1111; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #0F1111; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; box-shadow: 0 4px 8px rgba(255, 153, 0, 0.3); }
+      .content { background-color: #232F3E; padding: 30px; border-radius: 0 0 5px 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+      .order-details { background-color: #37475A; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border-left: 4px solid #ff9900; }
       .order-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-      .order-table th { background-color: #232F3E; padding: 12px 8px; text-align: left; border-bottom: 2px solid #ff9900; font-weight: bold; color: #ffffff; font-size: 14px; }
-      .order-table td { padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 14px; }
-      .order-table tbody tr:hover { background-color: #f5f5f5; }
-      .product-name { font-weight: bold; color: #232F3E; }
+      .order-table th { background-color: #1B2631; padding: 12px 8px; text-align: left; border-bottom: 2px solid #ff9900; font-weight: bold; color: #FFFFFF; font-size: 14px; }
+      .order-table td { padding: 12px 8px; border-bottom: 1px solid #3F4B59; font-size: 14px; color: #DDD; }
+      .order-table tbody tr:hover { background-color: #3F4B59; }
+      .product-name { font-weight: bold; color: #FFFFFF; }
       .text-right { text-align: right; }
       .text-center { text-align: center; }
-      .total-row { background-color: #232F3E; font-weight: bold; font-size: 16px; }
+      .total-row { background-color: #0F1111; font-weight: bold; font-size: 16px; }
       .total-row td { padding: 15px 12px; color: #ff9900; }
-      .button { display: inline-block; padding: 12px 30px; background-color: #146eb4; color: #ffffff; text-decoration: none; border-radius: 5px; margin: 10px 5px; font-weight: bold; }
-      .button:hover { background-color: #00A8E1; }
-      .button-secondary { background-color: #ff9900; }
-      .button-secondary:hover { background-color: #e47911; }
-      .warning { background-color: #fff3cd; border-left: 4px solid #ff9900; padding: 15px; margin: 20px 0; border-radius: 3px; }
-      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      .button { display: inline-block; padding: 12px 30px; background-color: #ff9900; color: #0F1111; text-decoration: none; border-radius: 8px; margin: 10px 5px; font-weight: bold; box-shadow: 0 4px 8px rgba(255, 153, 0, 0.4); transition: all 0.3s; }
+      .button:hover { background-color: #e47911; box-shadow: 0 6px 12px rgba(255, 153, 0, 0.6); }
+      .button-secondary { background-color: #146eb4; color: #FFFFFF; }
+      .button-secondary:hover { background-color: #00A8E1; }
+      .warning { background-color: #3F4B59; border-left: 4px solid #ff9900; padding: 15px; margin: 20px 0; border-radius: 5px; color: #FFD700; }
+      .footer { text-align: center; margin-top: 20px; color: #AAA; font-size: 12px; }
       
       /* Responsive para móviles */
       @media only screen and (max-width: 600px) {
@@ -43,11 +43,11 @@
         <h1>🛒 Verifica tu Pago</h1>
       </div>
       <div class="content">
-        <p>¡Hola <strong>{{name}}</strong>!</p>
-        <p>Acabas de crear una nueva orden de compra. Por favor verifica tu pago para completar la transacción.</p>
+        <p style="color: #FFFFFF;">¡Hola <strong style="color: #ff9900;">{{name}}</strong>!</p>
+        <p style="color: #DDD;">Acabas de crear una nueva orden de compra. Por favor verifica tu pago para completar la transacción.</p>
         
         <div class="order-details">
-          <h3>Orden de venta #{{orderId}}</h3>
+          <h3 style="color: #FFFFFF; margin-top: 0;">Orden de venta #<span style="color: #ff9900;">{{orderId}}</span></h3>
           
           <table class="order-table">
             <thead>
@@ -84,12 +84,13 @@
           </a>
         </div>
 
-        <p style="margin-top: 30px; font-size: 14px; color: #666;">
+        <p style="margin-top: 30px; font-size: 14px; color: #AAA;">
           Si no creaste esta orden, puedes ignorar este mensaje. La orden será cancelada automáticamente.
         </p>
       </div>
       <div class="footer">
-        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
+        <p style="color: #AAA;">&copy; {{year}} <strong style="color: #ff9900;">API Ventas</strong>. Todos los derechos reservados.</p>
+        <p style="margin-top: 10px; font-size: 11px; color: #888;">Este correo es generado automáticamente. Por favor no responder.</p>
       </div>
     </div>
   </body>

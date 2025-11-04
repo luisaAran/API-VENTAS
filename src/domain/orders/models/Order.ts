@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, Timestamp } from 'typeorm';
 import { User } from '../../users/models/User';
 import { OrderItem } from './OrderItem';
 
@@ -8,6 +8,10 @@ export class Order {
   id!: number;
   @CreateDateColumn()
   createdAt!: Date;
+
+  @Column({ type: 'timestamp', nullable: true, default: null })
+  cancelledAt!: Date | null;
+
   @Column({ 
     type: 'decimal', 
     precision: 12, 
