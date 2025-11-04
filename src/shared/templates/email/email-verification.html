@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; }
+      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+      .button { display: inline-block; padding: 15px 40px; background-color: #146eb4; color: #ffffff; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: background-color 0.3s; }
+      .button:hover { background-color: #00A8E1; }
+      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      .welcome-icon { font-size: 48px; margin-bottom: 10px; }
+      @media only screen and (max-width: 600px) {
+        .container { padding: 10px; }
+        .header { padding: 20px 10px; }
+        .content { padding: 15px; }
+        .button { padding: 12px 30px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        h1 { font-size: 22px; }
+        .welcome-icon { font-size: 36px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="welcome-icon">🎉</div>
+        <h1>¡Bienvenido/a a Ventas!</h1>
+      </div>
+      <div class="content">
+        <p>¡Hola <strong>{{name}}</strong>!</p>
+        <p>¡Gracias por registrarte! Por favor verifica tu dirección de correo electrónico para activar tu cuenta.</p>
+        <p style="text-align: center;">
+          <a href="{{verificationLink}}" class="button">✓ Verificar Correo Electrónico</a>
+        </p>
+        <p style="font-size: 14px; color: #666;">
+          O copia y pega este enlace en tu navegador:<br>
+          <a href="{{verificationLink}}" style="color: #146eb4; word-break: break-all;">{{verificationLink}}</a>
+        </p>
+        <p style="margin-top: 30px; font-size: 14px; color: #666;">
+          Este enlace expirará en <strong>24 horas</strong>.
+        </p>
+        <p style="font-size: 14px; color: #666;">
+          Si no creaste esta cuenta, por favor ignora este correo.
+        </p>
+      </div>
+      <div class="footer">
+        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
+        <p style="margin-top: 10px; font-size: 11px;">Este correo es generado automáticamente. Por favor no responder.</p>
+      </div>
+    </div>
+  </body>
+</html>

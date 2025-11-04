@@ -10,13 +10,26 @@ const transporter = nodemailer.createTransport({
     : undefined,
 });
 
-export async function sendMail(to: string, subject: string, html: string, text?: string) {
+interface MailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
+export async function sendMail(
+  to: string,
+  subject: string,
+  html: string,
+  text?: string,
+  attachments?: MailAttachment[]
+) {
   const info = await transporter.sendMail({
     from: appConfig.smtp.from,
     to,
     subject,
     text: text || undefined,
     html,
+    attachments: attachments || undefined,
   });
   return info;
 }

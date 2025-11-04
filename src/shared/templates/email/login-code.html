@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; }
+      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+      .code-box { background-color: #ffffff; border: 3px dashed #ff9900; padding: 25px; text-align: center; margin: 20px 0; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ff9900; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      .lock-icon { font-size: 48px; margin-bottom: 10px; }
+      
+      /* Responsive para móviles */
+      @media only screen and (max-width: 600px) {
+        .container { padding: 10px; }
+        .header { padding: 20px 10px; }
+        .content { padding: 15px; }
+        .code-box { padding: 15px; }
+        .code { font-size: 28px; letter-spacing: 5px; }
+        h1 { font-size: 22px; }
+        .lock-icon { font-size: 36px; }
+      }
+    </style>
+    </meta>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="lock-icon">🔐</div>
+        <h1>Código de Verificación de Acceso</h1>
+      </div>
+      <div class="content">
+        <p>¡Hola <strong>{{name}}</strong>!</p>
+        <p>Tu código de verificación para iniciar sesión es:</p>
+        <div class="code-box">
+          <div class="code">{{code}}</div>
+        </div>
+        <p style="font-size: 14px; color: #666; text-align: center;">
+          Ingresa este código en la página de verificación para completar tu inicio de sesión.
+        </p>
+        <p style="margin-top: 30px; font-size: 14px; color: #666; background-color: #fff3cd; padding: 10px; border-radius: 5px; border-left: 4px solid #ff9900;">
+          ⏱️ Este código expirará en <strong>10 minutos</strong>.
+        </p>
+        <p style="font-size: 14px; color: #666;">
+          Si no intentaste iniciar sesión, por favor ignora este correo o contacta a soporte si estás preocupado/a por la seguridad de tu cuenta.
+        </p>
+      </div>
+      <div class="footer">
+        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
+        <p style="margin-top: 10px; font-size: 11px;">Este correo es generado automáticamente. Por favor no responder.</p>
+      </div>
+    </div>
+  </body>
+</html>

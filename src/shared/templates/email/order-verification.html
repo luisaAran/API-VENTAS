@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+      .order-details { background-color: #ffffff; padding: 20px; border-radius: 5px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .order-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+      .order-table th { background-color: #232F3E; padding: 12px 8px; text-align: left; border-bottom: 2px solid #ff9900; font-weight: bold; color: #ffffff; font-size: 14px; }
+      .order-table td { padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 14px; }
+      .order-table tbody tr:hover { background-color: #f5f5f5; }
+      .product-name { font-weight: bold; color: #232F3E; }
+      .text-right { text-align: right; }
+      .text-center { text-align: center; }
+      .total-row { background-color: #232F3E; font-weight: bold; font-size: 16px; }
+      .total-row td { padding: 15px 12px; color: #ff9900; }
+      .button { display: inline-block; padding: 12px 30px; background-color: #146eb4; color: #ffffff; text-decoration: none; border-radius: 5px; margin: 10px 5px; font-weight: bold; }
+      .button:hover { background-color: #00A8E1; }
+      .button-secondary { background-color: #ff9900; }
+      .button-secondary:hover { background-color: #e47911; }
+      .warning { background-color: #fff3cd; border-left: 4px solid #ff9900; padding: 15px; margin: 20px 0; border-radius: 3px; }
+      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      
+      /* Responsive para móviles */
+      @media only screen and (max-width: 600px) {
+        .container { padding: 10px; }
+        .content { padding: 15px; }
+        .order-details { padding: 10px; }
+        .order-table th, .order-table td { padding: 8px 4px; font-size: 12px; }
+        .order-table th:first-child, .order-table td:first-child { display: none; } /* Ocultar # en móvil */
+        .button { display: block; width: 90%; margin: 10px auto; padding: 15px; }
+        h1 { font-size: 20px; }
+        h3 { font-size: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🛒 Verifica tu Pago</h1>
+      </div>
+      <div class="content">
+        <p>¡Hola <strong>{{name}}</strong>!</p>
+        <p>Acabas de crear una nueva orden de compra. Por favor verifica tu pago para completar la transacción.</p>
+        
+        <div class="order-details">
+          <h3>Orden de venta #{{orderId}}</h3>
+          
+          <table class="order-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-right">Precio Unit.</th>
+                <th class="text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{itemsRows}}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="4" class="text-right">TOTAL:</td>
+                <td class="text-right">${{total}}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="warning">
+          ⚠️ <strong>Importante:</strong> Este link de verificacion expira en <strong>5 minutos</strong>. 
+          Si no verificas tu orden en este plazo, la orden será automáticamente cancelada.
+        </div>
+
+        <div style="text-align: center;">
+          <a href="{{verificationLink}}" class="button">✓ Verificar Pago Ahora</a>
+          <br>
+          <a href="{{verificationLinkWithRemember}}" class="button button-secondary">
+            🔒 Verificar y Recordar Dispositivo (30 días)
+          </a>
+        </div>
+
+        <p style="margin-top: 30px; font-size: 14px; color: #666;">
+          Si no creaste esta orden, puedes ignorar este mensaje. La orden será cancelada automáticamente.
+        </p>
+      </div>
+      <div class="footer">
+        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
+      </div>
+    </div>
+  </body>
+</html>

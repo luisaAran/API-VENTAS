@@ -9,6 +9,7 @@ import {
   verifyEmailSchema,
   loginSchema,
   verifyLoginCodeSchema,
+  logoutSchema,
 } from '../validations/auth.validations';
 
 export class AuthRoutes {
@@ -48,5 +49,18 @@ export class AuthRoutes {
       asyncHandler(this.controller.verifyLoginCode.bind(this.controller))
     ); // code -> tokens
     this.router.post('/refresh', asyncHandler(this.controller.refreshToken.bind(this.controller)));
+    this.router.get(
+      '/verify-order',
+      asyncHandler(this.controller.verifyOrder.bind(this.controller))
+    ); // GET with ?token=xxx&remember=true
+    this.router.get(
+      '/notification-preferences',
+      asyncHandler(this.controller.updateNotificationPreferences.bind(this.controller))
+    ); // GET with ?token=xxx&notify=true/false
+    this.router.post(
+      '/logout',
+      validateZod(logoutSchema),
+      asyncHandler(this.controller.logout.bind(this.controller))
+    );
   }
 }

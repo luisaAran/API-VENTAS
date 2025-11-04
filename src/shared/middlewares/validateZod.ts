@@ -25,12 +25,10 @@ export const validateZod = (schema: ZodSchema<any>) => {
         query: req.query,
         params: req.params,
       });
-
       if (!result.success) {
         const formattedErrors = formatZodErrors(result.error);
         throw new ValidationError('Validation failed', formattedErrors);
       }
-      // Replace request parts with validated data
       if (result.data.body) req.body = result.data.body;
       if (result.data.query) req.query = result.data.query;
       if (result.data.params) req.params = result.data.params;
@@ -41,9 +39,6 @@ export const validateZod = (schema: ZodSchema<any>) => {
   };
 };
 
-/**
- * Format Zod errors to a more user-friendly structure
- */
 function formatZodErrors(error: ZodError) {
   return error.errors.reduce((acc, err) => {
     const path = err.path.join('.');

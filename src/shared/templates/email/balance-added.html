@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #232F3E; margin: 0; padding: 0; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { background: linear-gradient(135deg, #ff9900 0%, #e47911 100%); color: #ffffff; padding: 30px 20px; text-align: center; border-radius: 5px 5px 0 0; }
+      .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px; }
+      .balance-box { background-color: #ffffff; padding: 25px; border-radius: 5px; margin: 20px 0; text-align: center; border: 3px solid #ff9900; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .amount { font-size: 36px; color: #ff9900; font-weight: bold; margin: 10px 0; }
+      .new-balance { font-size: 24px; color: #232F3E; margin: 10px 0; font-weight: bold; }
+      .products-section { margin-top: 30px; }
+      .products-title { color: #ff9900; font-size: 20px; margin-bottom: 15px; text-align: center; font-weight: bold; }
+      .product-card { background-color: #ffffff; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #146eb4; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+      .product-name { font-weight: bold; color: #232F3E; font-size: 16px; margin-bottom: 5px; }
+      .product-details { color: #666; font-size: 14px; }
+      .product-price { color: #ff9900; font-weight: bold; font-size: 18px; margin-top: 5px; }
+      .stock-badge { display: inline-block; background-color: #e3f2fd; color: #146eb4; padding: 3px 8px; border-radius: 3px; font-size: 12px; margin-left: 5px; }
+      .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+      .money-icon { font-size: 48px; margin-bottom: 10px; }
+      
+      /* Responsive para móviles */
+      @media only screen and (max-width: 600px) {
+        .container { padding: 10px; }
+        .header { padding: 20px 10px; }
+        .content { padding: 15px; }
+        .balance-box { padding: 15px; }
+        .amount { font-size: 28px; }
+        .new-balance { font-size: 20px; }
+        .product-card { padding: 12px; }
+        h1 { font-size: 22px; }
+        .money-icon { font-size: 36px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="money-icon">💰</div>
+        <h1>¡Saldo Agregado Exitosamente!</h1>
+      </div>
+      <div class="content">
+        <p>¡Hola <strong>{{name}}</strong>!</p>
+        <p>Tu saldo ha sido actualizado correctamente.</p>
+        
+        <div class="balance-box">
+          <div style="color: #666; font-size: 14px;">Monto Agregado</div>
+          <div class="amount">+${{amountAdded}}</div>
+          <div style="color: #666; margin: 15px 0;">━━━━━━━━━━━━</div>
+          <div style="color: #666; font-size: 14px;">Nuevo Saldo</div>
+          <div class="new-balance">${{newBalance}}</div>
+        </div>
+
+        <p style="text-align: center; color: #666;">
+          ¡Ahora puedes usar este saldo para comprar productos en nuestra tienda!
+        </p>
+
+        {{productsSection}}
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 12px;">
+          <p>¿No deseas recibir notificaciones de actualización de saldo?</p>
+          <p><a href="{{unsubscribeLink}}" style="color: #146eb4; text-decoration: underline;">Desuscribirte de actualizaciones de saldo</a></p>
+        </div>
+      </div>
+      <div class="footer">
+        <p>&copy; {{year}} API Ventas. Todos los derechos reservados.</p>
+        <p style="margin-top: 10px; font-size: 11px;">Este correo es generado automáticamente. Por favor no responder.</p>
+      </div>
+    </div>
+  </body>
+</html>

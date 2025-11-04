@@ -7,6 +7,12 @@ export const config = {
   loginCodeExpiryMinutes: parseInt(process.env.LOGIN_CODE_EXPIRY_MINUTES || '10', 10),
   // Email verification token expiry in hours
   emailVerificationExpiryHours: parseInt(process.env.EMAIL_VERIFICATION_EXPIRY_HOURS || '24', 10),
+  // Trusted device token expiry in days
+  trustedDeviceExpiresDays: parseInt(process.env.TRUSTED_DEVICE_EXPIRES_DAYS || '30', 10),
+  // Order verification token expiry in minutes
+  orderVerificationExpiryMinutes: parseInt(process.env.ORDER_VERIFICATION_EXPIRY_MINUTES || '5', 10),
+  // Trusted payment token expiry in days
+  trustedPaymentExpiresDays: parseInt(process.env.TRUSTED_PAYMENT_EXPIRES_DAYS || '30', 10),
   smtp: {
     host: process.env.SMTP_HOST || 'localhost',
     port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,

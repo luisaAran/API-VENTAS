@@ -73,8 +73,8 @@ Verifica el email del usuario mediante un token JWT enviado por query parameter.
 
 ---
 
-### 3. Login (Request 2FA Code)
-Valida credenciales y envía un código de 6 dígitos al email del usuario para autenticación de dos factores.
+### 3. Login (Request 2FA Code or Direct Login)
+Valida credenciales. Si el dispositivo es de confianza (tiene `trustedDevice` cookie válida), inicia sesión directamente sin 2FA. Si no, envía un código de 6 dígitos al email para autenticación de dos factores.
 
 **Endpoint:** `POST /api/auth/login`
 
@@ -86,13 +86,36 @@ Valida credenciales y envía un código de 6 dígitos al email del usuario para 
 }
 ```
 
-**Success Response (200):**
+**Success Response (Trusted Device) - 200:**
 ```json
 {
   "ok": true,
+  "skipTwoFactor": true,
+  "message": "Login successful (trusted device)",
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez",
+    "email": "juan@example.com",
+    "role": "user"
+  }
+}
+```
+
+**Cookies Set (Trusted Device):**
+- `accessToken`: JWT con duración de 1 hora
+- `refreshToken`: JWT con duración de 7 días
+
+**Success Response (New/Untrusted Device) - 200:**
+```json
+{
+  "ok": true,
+  "skipTwoFactor": false,
   "message": "Login code sent to your email"
 }
 ```
+
+**Cookies Set (New Device):**
+- `pendingAuth`: JWT con código encriptado, duración de 10 minutos (HTTP-only, secure en producción, sameSite: strict)
 
 **Error Responses:**
 - `401 AUTHENTICATION_ERROR`: Credenciales inválidas
@@ -102,32 +125,55 @@ Valida credenciales y envía un código de 6 dígitos al email del usuario para 
 ---
 
 ### 4. Verify Login Code
-Verifica el código de 2FA y genera tokens JWT (access + refresh) que se almacenan en cookies HTTP-only.
+Verifica el código de 2FA leyendo el JWT de la cookie `pendingAuth` y comparando el código. Si es válido, genera tokens JWT (access + refresh) que se almacenan en cookies HTTP-only y elimina la cookie `pendingAuth`. **Opcionalmente**, puede marcar el dispositivo como confiable para omitir 2FA en futuros inicios de sesión.
 
 **Endpoint:** `POST /api/auth/verify-code`
 
 **Request Body:**
 ```json
 {
-  "email": "user@example.com",
-  "code": "123456"
+  "code": "123456",
+  "rememberDevice": true
 }
 ```
+
+**Validation Rules:**
+- `code`: 6 dígitos numéricos, requerido
+- `rememberDevice`: Boolean, opcional (default: false)
 
 **Success Response (200):**
 ```json
 {
   "ok": true,
-  "message": "Login successful"
+  "message": "Login successful",
+  "trustedDevice": true,
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez",
+    "email": "juan@example.com",
+    "role": "user"
+  }
 }
 ```
 
 **Cookies Set:**
 - `accessToken`: JWT con duración de 1 hora (HTTP-only, secure en producción)
 - `refreshToken`: JWT con duración de 7 días (HTTP-only, secure en producción)
+- `trustedDevice` (si `rememberDevice: true`): JWT con duración de 30 días (HTTP-only, secure en producción, sameSite: strict)
+
+**Cookies Removed:**
+- `pendingAuth`: Se elimina después de la verificación exitosa
+
+**Notes:**
+- El `trustedDevice` token persiste incluso después de hacer logout (a menos que se use `forgetDevice: true`)
+- Permite inicios de sesión sin 2FA en el mismo dispositivo/navegador durante 30 días
+- Ideal para dispositivos personales del usuario
 
 **Error Responses:**
-- `401 AUTHENTICATION_ERROR`: Código inválido o expirado
+- `401 AUTHENTICATION_ERROR`: No hay cookie `pendingAuth` (usuario debe hacer login primero)
+- `401 AUTHENTICATION_ERROR`: Código inválido
+- `401 AUTHENTICATION_ERROR`: JWT expirado (código caducó después de 10 minutos)
+- `401 AUTHENTICATION_ERROR`: JWT inválido o manipulado
 - `404 NOT_FOUND`: Usuario no encontrado
 
 ---
@@ -156,6 +202,163 @@ Refresca el access token usando el refresh token almacenado en cookies. Implemen
 - `401 AUTHENTICATION_ERROR`: Refresh token expirado o inválido
 - `400 VALIDATION_ERROR`: Tipo de token incorrecto
 - `404 NOT_FOUND`: Usuario no encontrado
+
+---
+
+### 6. Verify Order Payment
+Verifica el pago de una orden mediante un token JWT enviado por email. Después de crear una orden sin dispositivo de pago confiable, el usuario recibe un email con un link de verificación. Este endpoint completa el pago deduciendo el balance del usuario y el stock de productos.
+
+**Endpoint:** `GET /api/auth/verify-order?token={jwt_token}&remember={true|false}`
+
+**Query Parameters:**
+- `token` (string, required): Token JWT de verificación de pago
+- `remember` (string, optional): "true" para marcar el dispositivo como confiable para pagos futuros, "false" o ausente para verificación única
+
+**Success Response - Primera Verificación (200):**
+```json
+{
+  "ok": true,
+  "message": "Payment verified successfully",
+  "trustedDevice": true,
+  "order": {
+    "id": 123,
+    "status": "completed",
+    "total": 699.98,
+    "createdAt": "2025-10-30T10:30:00.000Z",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "balance": 300.02
+    },
+    "items": [
+      {
+        "id": 1,
+        "quantity": 1,
+        "unitPrice": 599.99,
+        "product": {
+          "id": 1,
+          "name": "Laptop HP",
+          "price": 599.99,
+          "stock": 49
+        }
+      },
+      {
+        "id": 2,
+        "quantity": 1,
+        "unitPrice": 99.99,
+        "product": {
+          "id": 2,
+          "name": "Mouse Logitech",
+          "price": 99.99,
+          "stock": 149
+        }
+      }
+    ]
+  }
+}
+```
+
+**Success Response - Link Ya Usado (200):**
+Si el usuario vuelve a usar el mismo link después de haber verificado:
+```json
+{
+  "ok": true,
+  "message": "This order was already verified and completed."
+}
+```
+
+**Response Fields (Primera Verificación):**
+- `trustedDevice`: `true` si `remember=true` en el query parameter, `false` en caso contrario
+- `order.status`: Estado actual de la orden ("completed", "pending", "cancelled")
+- `order.total`: Total pagado por la orden
+- `order.createdAt`: Timestamp de creación de la orden
+- `order.user.id`: ID del usuario
+- `order.user.name`: Nombre del usuario
+- `order.user.balance`: Balance actual del usuario **después del pago**
+- `order.items`: Array con los productos comprados
+  - `quantity`: Cantidad comprada
+  - `unitPrice`: Precio unitario al momento de la compra
+  - `product`: Información del producto (ID, nombre, precio actual, stock actual)
+
+**Security & Privacy:**
+- ❌ NO se incluye: email, contraseña, rol, tokens de confianza
+- ✅ Solo se muestra: estado de orden, balance actual, productos comprados, timestamp
+
+**Cookies Set (if remember=true):**
+- `trustedPayment`: JWT con duración de 30 días (HTTP-only, secure en producción, sameSite: strict)
+
+**Error Response - Orden Cancelada (400):**
+```json
+{
+  "ok": false,
+  "message": "This order has been cancelled. This could be due to: verification timeout (>5 minutes), insufficient balance, or manual cancellation.",
+  "error": "ORDER_CANCELLED"
+}
+```
+
+**Other Error Responses:**
+- `400 VALIDATION_ERROR`: Token con propósito incorrecto
+- `401 AUTHENTICATION_ERROR`: Token expirado (>5 minutos) - La orden es cancelada automáticamente
+- `401 AUTHENTICATION_ERROR`: Token inválido o manipulado
+- `404 NOT_FOUND`: Orden o usuario no encontrado
+
+**Notes:**
+- El link de verificación expira en **5 minutos**
+- Si el token expira, la orden se marca automáticamente como `cancelled`
+- Si el balance es insuficiente al verificar, la orden se cancela
+- Con `remember=true`, futuros pagos en ese dispositivo se auto-aprueban sin verificación
+- **El link puede usarse múltiples veces**: Si el usuario ya verificó la orden y vuelve a hacer click en el link:
+  - ✅ Retorna status 200 con mensaje simple: `"This order was already verified and completed."`
+  - ✅ NO devuelve información de la orden (por seguridad y simplicidad)
+  - ✅ NO intenta cobrar nuevamente
+  - ✅ NO genera error ni cookie de dispositivo de confianza
+- **Mensajes amigables**: El sistema detecta si la orden ya fue completada y devuelve un mensaje claro y conciso
+
+---
+
+### 7. Logout
+Cierra la sesión del usuario eliminando las cookies de autenticación (`accessToken` y `refreshToken`). Opcionalmente puede eliminar también los tokens de dispositivo de confianza (2FA y pagos).
+
+**Endpoint:** `POST /api/auth/logout`
+
+**Request Body (opcional):**
+```json
+{
+  "forgetDevice": true
+}
+```
+
+**Validation Rules:**
+- `forgetDevice`: Boolean, opcional (default: false)
+
+**Success Response (Normal Logout) - 200:**
+```json
+{
+  "ok": true,
+  "message": "Logout successful"
+}
+```
+
+**Success Response (Forget Device) - 200:**
+```json
+{
+  "ok": true,
+  "message": "Logout successful and device forgotten"
+}
+```
+
+**Cookies Cleared:**
+- `accessToken`: Siempre se elimina
+- `refreshToken`: Siempre se elimina
+- `trustedDevice`: Solo se elimina si `forgetDevice: true` (cookie de 2FA)
+- `trustedPayment`: Solo se elimina si `forgetDevice: true` (cookie de pagos)
+
+**Notes:**
+- **Logout normal**: Cierra sesión pero mantiene los dispositivos como confiables. Próximos logins y pagos sin verificación adicional.
+- **Forget device**: Cierra sesión y elimina tokens de confianza. Próximo login requerirá 2FA y próximas compras requerirán verificación por email.
+- Este endpoint siempre retorna éxito, incluso si no hay cookies para limpiar
+- No requiere autenticación previa (cualquiera puede llamarlo)
+- Útil en dispositivos compartidos o públicos usar `forgetDevice: true`
 
 ---
 
@@ -193,12 +396,25 @@ Obtiene la lista de todos los usuarios registrados (sin incluir contraseñas).
 
 ## 📦 Products Endpoints (`/api/products`)
 
-### 1. List Products
-Obtiene la lista de todos los productos disponibles. **Requiere autenticación** - usuarios y admins pueden ver productos.
+### 1. List Products (with filters)
+Obtiene la lista de todos los productos disponibles con filtros opcionales. **Requiere autenticación** - usuarios y admins pueden ver productos.
 
 **Endpoint:** `GET /api/products`
 
 **Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Query Parameters (opcional):**
+- `name` (string): Busca productos por nombre (búsqueda parcial)
+- `minPrice` (number): Filtra productos con precio mayor o igual
+- `maxPrice` (number): Filtra productos con precio menor o igual
+
+**Examples:**
+```
+GET /api/products
+GET /api/products?name=laptop
+GET /api/products?minPrice=100&maxPrice=500
+GET /api/products?name=mouse&maxPrice=100
+```
 
 **Success Response (200):**
 ```json
@@ -222,16 +438,46 @@ Obtiene la lista de todos los productos disponibles. **Requiere autenticación**
 
 **Error Responses:**
 - `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: Query params inválidos
 - `500 INTERNAL_ERROR`: Error al obtener productos
 
 ---
 
-### 2. Create Product
-Crea un nuevo producto en el catálogo. **Requiere autenticación** - usuarios y admins pueden crear productos.
+### 2. Get Product by ID
+Obtiene un producto específico por su ID. **Requiere autenticación** - usuarios y admins pueden ver un producto.
+
+**Endpoint:** `GET /api/products/:id`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID del producto
+
+**Success Response (200):**
+```json
+{
+  "id": 1,
+  "name": "Laptop HP",
+  "description": "Laptop HP 15.6 pulgadas, 8GB RAM, 256GB SSD",
+  "price": 599.99,
+  "stock": 50
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: ID inválido
+- `404 NOT_FOUND`: Producto no encontrado
+- `500 INTERNAL_ERROR`: Error al obtener producto
+
+---
+
+### 3. Create Product
+Crea un nuevo producto en el catálogo. **Requiere autenticación de ADMIN** - solo administradores pueden crear productos.
 
 **Endpoint:** `POST /api/products`
 
-**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `admin`.
 
 **Request Body:**
 ```json
@@ -262,14 +508,148 @@ Crea un nuevo producto en el catálogo. **Requiere autenticación** - usuarios y
 
 **Error Responses:**
 - `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
 - `400 VALIDATION_ERROR`: Datos del producto inválidos (ver reglas de validación)
 - `500 INTERNAL_ERROR`: Error al crear producto
 
 ---
 
+### 4. Update Product
+Actualiza un producto existente. **Requiere autenticación de ADMIN** - solo administradores pueden editar productos.
+
+**Endpoint:** `PUT /api/products/:id`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID del producto
+
+**Request Body (todos los campos opcionales):**
+```json
+{
+  "name": "Laptop HP Actualizada",
+  "description": "Nueva descripción",
+  "price": 649.99,
+  "stock": 40
+}
+```
+
+**Validation Rules:**
+- `name`: 2-200 caracteres, opcional
+- `description`: 10-1000 caracteres, opcional
+- `price`: Número positivo, máximo 1,000,000, opcional
+- `stock`: Entero no negativo, máximo 1,000,000, opcional
+
+**Success Response (200):**
+```json
+{
+  "id": 1,
+  "name": "Laptop HP Actualizada",
+  "description": "Nueva descripción",
+  "price": 649.99,
+  "stock": 40
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: Datos inválidos
+- `404 NOT_FOUND`: Producto no encontrado
+- `500 INTERNAL_ERROR`: Error al actualizar producto
+
+---
+
+### 5. Delete Product
+Elimina un producto del catálogo. **Requiere autenticación de ADMIN** - solo administradores pueden eliminar productos.
+
+**Endpoint:** `DELETE /api/products/:id`
+
+**Authentication:** Requiere cookies con `accessToken` or `refreshToken` válidos. Roles permitidos: `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID del producto
+
+**Success Response (200):**
+```json
+{
+  "ok": true,
+  "message": "Product deleted successfully"
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: ID inválido
+- `404 NOT_FOUND`: Producto no encontrado
+- `500 INTERNAL_ERROR`: Error al eliminar producto
+
+---
+
 ## 👥 Users Endpoints (`/api/users`)
 
-### 1. List Users
+### 1. Get My Profile
+Obtiene el perfil del usuario autenticado incluyendo todas sus órdenes. **Requiere autenticación** - usuarios y admins pueden ver su propio perfil.
+
+**Endpoint:** `GET /api/users/me`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Success Response (200):**
+```json
+{
+  "id": 1,
+  "name": "Juan Pérez",
+  "email": "juan@example.com",
+  "balance": 1000,
+  "role": "user",
+  "emailVerified": true,
+  "orders": [
+    {
+      "id": 1,
+      "createdAt": "2025-10-28T10:30:00.000Z",
+      "total": 699.98,
+      "status": "pending",
+      "items": [
+        {
+          "id": 1,
+          "quantity": 1,
+          "unitPrice": 599.99,
+          "product": {
+            "id": 1,
+            "name": "Laptop HP",
+            "description": "Laptop HP 15.6 pulgadas",
+            "price": 599.99,
+            "stock": 49
+          }
+        },
+        {
+          "id": 2,
+          "quantity": 1,
+          "unitPrice": 99.99,
+          "product": {
+            "id": 2,
+            "name": "Mouse Logitech",
+            "description": "Mouse inalámbrico",
+            "price": 99.99,
+            "stock": 149
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `404 NOT_FOUND`: Usuario no encontrado
+- `500 INTERNAL_ERROR`: Error al obtener perfil
+
+---
+
+### 2. List Users
 Obtiene la lista de todos los usuarios registrados (sin incluir contraseñas). **Requiere autenticación de ADMIN** - solo administradores pueden ver la lista completa de usuarios.
 
 **Endpoint:** `GET /api/users`
@@ -302,6 +682,447 @@ Obtiene la lista de todos los usuarios registrados (sin incluir contraseñas). *
 - `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
 - `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
 - `500 INTERNAL_ERROR`: Error al obtener usuarios
+
+---
+
+## � Users Endpoints (`/api/users`)
+
+### 1. Get My Profile
+Obtiene el perfil del usuario autenticado, incluyendo su balance actual y sus órdenes.
+
+**Endpoint:** `GET /api/users/me`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Success Response (200):**
+```json
+{
+  "id": 1,
+  "name": "Juan Pérez",
+  "email": "juan@example.com",
+  "balance": 500.50,
+  "emailVerified": true,
+  "role": "user",
+  "orders": [
+    {
+      "id": 1,
+      "createdAt": "2025-10-30T10:30:00.000Z",
+      "total": "150.00",
+      "status": "completed"
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `404 NOT_FOUND`: Usuario no encontrado
+- `500 INTERNAL_ERROR`: Error al obtener perfil
+
+---
+
+### 2. Add Balance
+Permite al usuario agregar dinero a su cuenta. Simula un depósito o recarga de balance. **Envía un email de confirmación** con el balance actualizado y sugerencias de productos dentro del rango de precio del usuario.
+
+**Endpoint:** `POST /api/users/balance`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Request Body:**
+```json
+{
+  "amount": 100.50
+}
+```
+
+**Validation Rules:**
+- `amount`: Número positivo, máximo $999,000,000 por transacción
+- Debe tener máximo 2 decimales (centavos)
+
+**Success Response (200):**
+```json
+{
+  "message": "Balance added successfully",
+  "newBalance": 600.50
+}
+```
+
+**Email Sent:**
+El usuario recibe un email HTML con:
+- Confirmación del monto añadido
+- Nuevo balance total
+- **Sección "Te puede interesar"** (opcional): Muestra hasta 3 productos aleatorios que el usuario puede comprar con su balance actual
+  - Se muestra solo si existen productos dentro del rango de precio
+  - Incluye: ID del producto, nombre, precio y stock disponible
+  - Si no hay productos disponibles o todos están fuera del rango de precio, se omite esta sección
+
+**Error Responses:**
+- `400 VALIDATION_ERROR`: Monto inválido (negativo, mayor a $999,000,000, más de 2 decimales)
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `404 NOT_FOUND`: Usuario no encontrado
+- `500 INTERNAL_ERROR`: Error al actualizar balance o enviar email
+
+---
+
+## �🛒 Orders Endpoints (`/api/orders`)
+
+### 1. Create Order
+Crea una nueva orden de compra con **verificación de pago por email**. **Requiere autenticación** - usuarios y admins pueden crear órdenes. El sistema valida balance del usuario y stock disponible, pero NO descuenta hasta verificar el pago.
+
+**Endpoint:** `POST /api/orders`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`. Opcionalmente cookie `trustedPayment` para auto-aprobar.
+
+**Request Body:**
+```json
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    },
+    {
+      "productId": 3,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Validation Rules:**
+- `items`: Array de 1-50 items, requerido
+- `productId`: Número entero positivo, requerido
+- `quantity`: Número entero entre 1-1000, requerido
+
+**Success Response - Dispositivo Confiable (201):**
+Si el usuario tiene cookie `trustedPayment` válida, la orden se completa inmediatamente:
+```json
+{
+  "order": {
+    "id": 1,
+    "createdAt": "2025-10-30T10:30:00.000Z",
+    "total": 1299.97,
+    "status": "completed",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com"
+    },
+    "items": [
+      {
+        "id": 1,
+        "quantity": 2,
+        "unitPrice": 599.99,
+        "product": {
+          "id": 1,
+          "name": "Laptop HP",
+          "price": 599.99,
+          "stock": 48
+        }
+      }
+    ]
+  },
+  "requiresVerification": false
+}
+```
+
+**Success Response - Requiere Verificación (201):**
+Si NO tiene cookie `trustedPayment`, la orden queda pendiente y se envía email de verificación:
+```json
+{
+  "order": {
+    "id": 1,
+    "createdAt": "2025-10-30T10:30:00.000Z",
+    "total": 1299.97,
+    "status": "pending",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com"
+    },
+    "items": [...]
+  },
+  "requiresVerification": true,
+  "message": "Order created. Please check your email to verify payment within 5 minutes."
+}
+```
+
+**Email Sent (if requiresVerification: true):**
+El usuario recibe un email HTML con:
+- Detalles de la orden (ID, total, items)
+- **Dos opciones de verificación:**
+  1. **"Verify Payment"**: Verificación única (no guarda dispositivo)
+  2. **"Verify & Trust This Device"**: Marca dispositivo como confiable (30 días)
+- Advertencia de expiración (5 minutos)
+- Nota de auto-cancelación si no verifica
+
+**Order Status Lifecycle:**
+1. **`pending`**: Orden creada, esperando verificación de pago (stock NO descontado, balance NO descontado)
+2. **`completed`**: Pago verificado, balance y stock descontados
+3. **`cancelled`**: Token de verificación expiró (>5 minutos) o balance insuficiente al verificar
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: Datos de la orden inválidos
+- `404 NOT_FOUND`: Producto no encontrado
+- `400 VALIDATION_ERROR`: Stock insuficiente para uno o más productos
+- `400 VALIDATION_ERROR`: Balance insuficiente (no se crea la orden)
+- `500 INTERNAL_ERROR`: Error al crear orden o enviar email
+
+**Notes:**
+- **Balance**: Se valida ANTES de crear la orden, pero NO se descuenta hasta verificar
+- **Stock**: Se valida ANTES de crear la orden, pero NO se descuenta hasta verificar
+- **Verificación**: El usuario tiene **5 minutos** para verificar el pago
+- **Auto-cancelación**: Si pasan 5 minutos sin verificar, la orden se marca como `cancelled`
+- **Dispositivo confiable**: Con cookie `trustedPayment`, las compras se completan instantáneamente sin email
+- **Duración cookie**: 30 días (configurable con `TRUSTED_PAYMENT_EXPIRES_DAYS`)
+
+---
+
+### 2. List All Orders (Admin Only)
+Obtiene la lista de todas las órdenes con filtros opcionales. **Requiere autenticación de ADMIN** - solo administradores pueden ver todas las órdenes.
+
+**Endpoint:** `GET /api/orders`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `admin`.
+
+**Query Parameters (opcional):**
+- `userId` (number): Filtra órdenes por ID de usuario
+- `status` (string): Filtra por estado (`pending`, `completed`, `cancelled`)
+- `minTotal` (number): Filtra órdenes con total mayor o igual
+- `maxTotal` (number): Filtra órdenes con total menor o igual
+
+**Examples:**
+```
+GET /api/orders
+GET /api/orders?userId=1
+GET /api/orders?status=pending
+GET /api/orders?minTotal=100&maxTotal=500
+GET /api/orders?userId=1&status=completed
+```
+
+**Success Response (200):**
+```json
+[
+  {
+    "id": 1,
+    "createdAt": "2025-10-29T10:30:00.000Z",
+    "total": 1299.97,
+    "status": "pending",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com"
+    },
+    "items": [...]
+  },
+  {
+    "id": 2,
+    "createdAt": "2025-10-29T11:00:00.000Z",
+    "total": 599.99,
+    "status": "completed",
+    "user": {
+      "id": 2,
+      "name": "María García",
+      "email": "maria@example.com"
+    },
+    "items": [...]
+  }
+]
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: Query params inválidos
+- `500 INTERNAL_ERROR`: Error al obtener órdenes
+
+---
+
+### 3. Get Order by ID
+Obtiene una orden específica por su ID. **Requiere autenticación** - usuarios y admins pueden ver órdenes.
+
+**Endpoint:** `GET /api/orders/:id`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID de la orden
+
+**Success Response (200):**
+```json
+{
+  "id": 1,
+  "createdAt": "2025-10-29T10:30:00.000Z",
+  "total": 1299.97,
+  "status": "pending",
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez",
+    "email": "juan@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "quantity": 2,
+      "unitPrice": 599.99,
+      "product": {
+        "id": 1,
+        "name": "Laptop HP",
+        "price": 599.99,
+        "stock": 48
+      }
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: ID inválido
+- `404 NOT_FOUND`: Orden no encontrada
+- `500 INTERNAL_ERROR`: Error al obtener orden
+
+---
+
+### 4. Update Order (Admin Only)
+Actualiza una orden existente. **Requiere autenticación de ADMIN** - solo administradores pueden editar órdenes. Al actualizar items, restaura el stock de los items antiguos y aplica los nuevos.
+
+**Endpoint:** `PUT /api/orders/:id`
+
+**Authentication:** Requiere cookies con `accessToken` or `refreshToken` válidos. Roles permitidos: `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID de la orden
+
+**Request Body (todos los campos opcionales):**
+```json
+{
+  "status": "completed",
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+**Validation Rules:**
+- `status`: Debe ser `pending`, `completed` o `cancelled`, opcional
+- `items`: Array de 1-50 items, opcional (si se envía, reemplaza todos los items)
+
+**Success Response (200):**
+```json
+{
+  "id": 1,
+  "createdAt": "2025-10-29T10:30:00.000Z",
+  "total": 599.99,
+  "status": "completed",
+  "user": {...},
+  "items": [...]
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: Datos inválidos
+- `404 NOT_FOUND`: Orden o producto no encontrado
+- `400 VALIDATION_ERROR`: Stock insuficiente
+- `500 INTERNAL_ERROR`: Error al actualizar orden
+
+---
+
+### 5. Delete Order (Admin Only)
+Elimina una orden y restaura el stock de los productos. **Requiere autenticación de ADMIN** - solo administradores pueden eliminar órdenes.
+
+**Endpoint:** `DELETE /api/orders/:id`
+
+**Authentication:** Requiere cookies con `accessToken` or `refreshToken` válidos. Roles permitidos: `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID de la orden
+
+**Success Response (200):**
+```json
+{
+  "ok": true,
+  "message": "Order deleted successfully and stock restored"
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: ID inválido
+- `404 NOT_FOUND`: Orden no encontrada
+- `500 INTERNAL_ERROR`: Error al eliminar orden
+
+---
+
+### 6. Cancel Order (User)
+Permite a un usuario cancelar su propia orden en estado pendiente. Solo se pueden cancelar órdenes que pertenezcan al usuario autenticado y que estén en estado `pending`. Por seguridad, si la orden no pertenece al usuario, se devuelve un error genérico de "orden no encontrada".
+
+**Endpoint:** `POST /api/orders/cancel`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `user`, `admin`.
+
+**Request Body:**
+```json
+{
+  "orderId": 123
+}
+```
+
+**Validation Rules:**
+- `orderId`: Número entero positivo, requerido
+
+**Success Response (200):**
+```json
+{
+  "message": "Orden cancelada exitosamente",
+  "order": {
+    "id": 123,
+    "createdAt": "2025-11-03T10:30:00.000Z",
+    "total": 599.99,
+    "status": "cancelled",
+    "user": {
+      "id": 1,
+      "name": "Juan Pérez",
+      "email": "juan@example.com"
+    },
+    "items": [
+      {
+        "id": 1,
+        "quantity": 1,
+        "unitPrice": 599.99,
+        "product": {
+          "id": 1,
+          "name": "Laptop HP",
+          "price": 599.99,
+          "stock": 50
+        }
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `400 VALIDATION_ERROR`: orderId no es un número válido o está ausente
+- `404 NOT_FOUND`: Orden no encontrada o no pertenece al usuario (mensaje genérico por seguridad)
+- `400 VALIDATION_ERROR`: La orden no está en estado pendiente (ya fue completada o cancelada)
+- `500 INTERNAL_ERROR`: Error al cancelar orden
+
+**Notes:**
+- Solo se pueden cancelar órdenes en estado `pending`
+- Si la orden no pertenece al usuario, se devuelve un error 404 genérico ("Order") por seguridad
+- Si la orden está en estado `completed` o `cancelled`, se devuelve un mensaje descriptivo del estado actual
+- La cancelación no requiere verificación adicional más allá de la autenticación del usuario
+- El stock NO se restaura al cancelar porque nunca fue descontado (solo se descuenta al completar la orden)
+- Máximo de 5 órdenes pendientes por usuario: al cancelar órdenes, se libera espacio para crear nuevas
 
 ---
 
@@ -362,7 +1183,7 @@ Los errores de validación (400 VALIDATION_ERROR) incluyen detalles específicos
 
 ---
 
-## 🔒 Authentication Flow
+## 🔒 Authentication & Payment Flow
 
 ### Flujo completo de autenticación:
 
@@ -373,14 +1194,56 @@ Los errores de validación (400 VALIDATION_ERROR) incluyen detalles específicos
    - Usuario hace click en link → `GET /api/auth/verify-email?token=xxx`
    - Email queda verificado
 
-2. **Login con 2FA**:
+2. **Login con 2FA o Dispositivo de Confianza**:
    - Usuario envía credenciales → `POST /api/auth/login`
    - Sistema valida que el email esté verificado
-   - Usuario recibe código de 6 dígitos por email
-   - Usuario envía código → `POST /api/auth/verify-code`
-   - Sistema genera tokens JWT en cookies (incluyen `userId`, `email`, `role`)
+   - **Si el dispositivo es de confianza** (tiene cookie `trustedDevice` válida):
+     - Sistema genera tokens JWT directamente en cookies (incluyen `userId`, `email`, `role`)
+     - Usuario inicia sesión inmediatamente sin 2FA
+   - **Si el dispositivo NO es de confianza**:
+     - Sistema genera un JWT con el código encriptado y lo almacena en cookie `pendingAuth` (expira en 10 minutos)
+     - Usuario recibe código de 6 dígitos por email
+     - Usuario envía código → `POST /api/auth/verify-code` con `{ code, rememberDevice }`
+     - Sistema lee el JWT de la cookie `pendingAuth`, valida el código
+     - Si es válido, elimina la cookie `pendingAuth` y genera tokens JWT en cookies
+     - Si `rememberDevice: true`, genera cookie `trustedDevice` (válida por 30 días)
 
-3. **Acceso a Rutas Protegidas**:
+### Flujo de Verificación de Pagos:
+
+3. **Crear Orden con Verificación de Pago**:
+   - Usuario autenticado crea orden → `POST /api/orders`
+   - Sistema valida balance del usuario y stock de productos
+   - **Si el dispositivo tiene pago confiable** (cookie `trustedPayment` válida):
+     - ✅ Descuenta balance del usuario inmediatamente
+     - ✅ Descuenta stock de productos inmediatamente
+     - ✅ Crea orden con status `completed`
+     - ✅ Retorna: `{ order, requiresVerification: false }`
+   - **Si el dispositivo NO tiene pago confiable**:
+     - ⏸️ NO descuenta balance ni stock todavía
+     - ⏸️ Crea orden con status `pending`
+     - 📧 Genera JWT token de verificación (expira en 5 minutos)
+     - 📧 Envía email HTML con dos opciones:
+       1. "Verify Payment" (link: `/api/auth/verify-order?token=xxx&remember=false`)
+       2. "Verify & Trust This Device" (link: `/api/auth/verify-order?token=xxx&remember=true`)
+     - ⏰ Inicia temporizador de 5 minutos para auto-cancelación
+     - Retorna: `{ order, requiresVerification: true, message: "Check email..." }`
+
+4. **Verificar Pago de Orden**:
+   - Usuario hace click en link del email → `GET /api/auth/verify-order?token=xxx&remember=true`
+   - **Si el token es válido (< 5 minutos)**:
+     - ✅ Descuenta balance del usuario
+     - ✅ Descuenta stock de productos
+     - ✅ Actualiza orden a status `completed`
+     - ✅ Si `remember=true`: genera cookie `trustedPayment` (30 días)
+     - Retorna: `{ ok: true, message: "Payment verified", order, trustedDevice }`
+   - **Si el token expiró (> 5 minutos)**:
+     - ❌ Marca orden como `cancelled`
+     - ❌ Retorna error: "Verification link expired. Order has been cancelled."
+   - **Si el balance es insuficiente al verificar**:
+     - ❌ Marca orden como `cancelled`
+     - ❌ Retorna error: "Insufficient balance"
+
+5. **Acceso a Rutas Protegidas**:
    - Cliente incluye automáticamente las cookies en cada request
    - Middleware `requireAuth()` valida el `accessToken`
    - **Si el `accessToken` está expirado**:
@@ -391,10 +1254,23 @@ Los errores de validación (400 VALIDATION_ERROR) incluyen detalles específicos
    - **Si ambos tokens son inválidos/expirados**:
      - Retorna 401 y pide al usuario que haga login nuevamente
 
-4. **Refresh Manual** (opcional):
+6. **Refresh Manual** (opcional):
    - Si el cliente detecta un token expirado
    - Cliente llama → `POST /api/auth/refresh`
    - Sistema genera nuevos tokens (rotación)
+
+7. **Logout**:
+   - Usuario cierra sesión → `POST /api/auth/logout` con `{ forgetDevice }`
+   - Sistema elimina las cookies `accessToken` y `refreshToken`
+   - **Si `forgetDevice: false` (default)**: 
+     - Mantiene cookies `trustedDevice` y `trustedPayment`
+     - Próximo login sin 2FA
+     - Próximas compras sin verificación de pago
+   - **Si `forgetDevice: true`**: 
+     - Elimina cookies `trustedDevice` y `trustedPayment`
+     - Próximo login con 2FA completo
+     - Próximas compras con verificación por email
+   - Recomendado usar `forgetDevice: true` en dispositivos compartidos o públicos
 
 ### Renovación Automática de Tokens:
 
@@ -409,6 +1285,47 @@ El sistema implementa **auto-refresh transparente**:
 ## 🍪 Cookies
 
 La API utiliza cookies HTTP-only para almacenar tokens JWT:
+
+### `pendingAuth`
+- **Duración**: 10 minutos
+- **Contenido**: `{ email, code, purpose: '2fa-verification' }`
+- **Uso**: Almacenar temporalmente el código 2FA durante el proceso de login
+- **Flags**: `httpOnly`, `secure` (en producción), `sameSite: strict`
+- **Ciclo de vida**: Se crea en `/api/auth/login` (dispositivos no confiables), se valida y elimina en `/api/auth/verify-code`
+
+### `trustedDevice`
+- **Duración**: 30 días (configurable con `TRUSTED_DEVICE_EXPIRES_DAYS`)
+- **Contenido**: `{ userId, email, purpose: 'trusted-device' }`
+- **Uso**: Identificar dispositivos de confianza para omitir 2FA
+- **Flags**: `httpOnly`, `secure` (en producción), `sameSite: strict`
+- **Ciclo de vida**: 
+  - Se crea en `/api/auth/verify-code` si `rememberDevice: true`
+  - Persiste entre sesiones (no se elimina con logout normal)
+  - Se elimina solo con `POST /api/auth/logout` + `forgetDevice: true`
+  - Permite login sin 2FA durante 30 días
+- **Recomendaciones**:
+  - ✅ Activar en dispositivos personales (laptop, móvil personal)
+  - ❌ NO activar en dispositivos compartidos o públicos
+
+### `trustedPayment`
+- **Duración**: 30 días (configurable con `TRUSTED_PAYMENT_EXPIRES_DAYS`)
+- **Contenido**: `{ userId, purpose: 'trusted-payment' }`
+- **Uso**: Identificar dispositivos de confianza para omitir verificación de pago por email
+- **Flags**: `httpOnly`, `secure` (en producción), `sameSite: strict`
+- **Ciclo de vida**: 
+  - Se crea en `/api/auth/verify-order` si `remember=true`
+  - Persiste entre sesiones (no se elimina con logout normal)
+  - Se elimina solo con `POST /api/auth/logout` + `forgetDevice: true`
+  - Permite pagos instantáneos sin verificación por email durante 30 días
+- **Beneficios**:
+  - ✅ Compras instantáneas sin esperar email de verificación
+  - ✅ Mejor UX para usuarios frecuentes en dispositivos personales
+  - ✅ Balance y stock se deducen inmediatamente
+  - ✅ Orden se marca como `completed` al instante
+- **Recomendaciones**:
+  - ✅ Activar en dispositivos personales de uso frecuente
+  - ❌ NO activar en dispositivos compartidos o públicos
+  - ⚠️ El usuario debe tener cuidado con la seguridad de su dispositivo
 
 ### `accessToken`
 - **Duración**: 1 hora
@@ -450,6 +1367,9 @@ JWT_EXPIRES_IN=1h
 REFRESH_TOKEN_EXPIRES_DAYS=7
 LOGIN_CODE_EXPIRY_MINUTES=10
 EMAIL_VERIFICATION_EXPIRY_HOURS=24
+TRUSTED_DEVICE_EXPIRES_DAYS=30
+ORDER_VERIFICATION_EXPIRY_MINUTES=5
+TRUSTED_PAYMENT_EXPIRES_DAYS=30
 
 # SMTP
 SMTP_HOST=smtp.example.com
@@ -469,4 +1389,11 @@ SMTP_FROM="Ventas <no-reply@example.com>"
 - Las contraseñas se hashean con bcrypt (10 rounds)
 - Los códigos 2FA expiran en 10 minutos
 - Los links de verificación de email expiran en 24 horas
+- Los tokens de verificación de pago expiran en 5 minutos (configurable)
+- Los tokens de dispositivo de confianza (2FA y pagos) expiran en 30 días (configurable)
 - Se implementa rotación de refresh tokens para mayor seguridad
+- Sistema de dispositivos de confianza permite omitir 2FA en dispositivos conocidos
+- Sistema de pagos confiables permite compras instantáneas sin verificación por email
+- Las órdenes se cancelan automáticamente si no se verifica el pago en 5 minutos
+- Balance y stock NO se deducen hasta que el pago es verificado (órdenes `pending`)
+- Balance y stock se deducen inmediatamente en dispositivos con `trustedPayment` cookie

@@ -28,37 +28,26 @@ export const requireAuth = (roles?: Array<'admin' | 'user'>) => {
     try {
       const accessToken = req.cookies?.accessToken;
       const refreshToken = req.cookies?.refreshToken;
-
-      // Case 1: No tokens at all
       if (!accessToken && !refreshToken) {
         throw new AuthenticationError('No authentication tokens found. Please log in.');
       }
-
-      // Case 2: Try to verify access token
       if (accessToken) {
         try {
           const decoded = jwt.verify(accessToken, appConfig.jwtSecret) as JwtPayload;
           req.user = decoded;
-
-          // Check role authorization
           if (roles && roles.length > 0) {
             const userRole = decoded.role || 'user';
             if (!roles.includes(userRole as 'admin' | 'user')) {
               throw new AuthenticationError('Insufficient permissions');
             }
           }
-
           return next();
         } catch (err: any) {
-          // If access token is invalid but not expired, reject immediately
           if (err.name !== 'TokenExpiredError') {
             throw new AuthenticationError('Invalid access token');
           }
-          // If expired, try to refresh (continue to Case 3)
         }
       }
-
-      // Case 3: Access token expired or missing, try refresh token
       if (refreshToken) {
         try {
           const decoded = jwt.verify(refreshToken, appConfig.jwtSecret) as JwtPayload;
@@ -107,7 +96,6 @@ export const requireAuth = (roles?: Array<'admin' | 'user'>) => {
           throw new AuthenticationError('Invalid refresh token');
         }
       }
-      // Case 4: No valid tokens
       throw new AuthenticationError('Authentication failed. Please log in.');
     } catch (error) {
       next(error);

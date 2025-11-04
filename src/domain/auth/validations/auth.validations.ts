@@ -82,14 +82,6 @@ export const loginSchema = z.object({
 // Verify login code schema
 export const verifyLoginCodeSchema = z.object({
   body: z.object({
-    email: z
-      .string({
-        required_error: 'Email is required',
-        invalid_type_error: 'Email must be a string',
-      })
-      .email('Invalid email format')
-      .toLowerCase()
-      .trim(),
     code: z
       .string({
         required_error: 'Code is required',
@@ -97,6 +89,22 @@ export const verifyLoginCodeSchema = z.object({
       })
       .length(6, 'Code must be exactly 6 digits')
       .regex(/^\d{6}$/, 'Code must contain only digits'),
+    rememberDevice: z
+      .boolean({
+        invalid_type_error: 'rememberDevice must be a boolean',
+      })
+      .optional(),
+  }),
+});
+
+// Logout schema
+export const logoutSchema = z.object({
+  body: z.object({
+    forgetDevice: z
+      .boolean({
+        invalid_type_error: 'forgetDevice must be a boolean',
+      })
+      .optional(),
   }),
 });
 

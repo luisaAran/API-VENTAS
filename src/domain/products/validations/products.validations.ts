@@ -25,7 +25,7 @@ export const createProductSchema = z.object({
         invalid_type_error: 'Price must be a number',
       })
       .positive('Price must be a positive number')
-      .max(1000000, 'Price must not exceed 1,000,000'),
+      .max(900000000, 'Price must not exceed 900,000,000'),
     stock: z
       .number({
         required_error: 'Stock is required',
@@ -37,5 +37,90 @@ export const createProductSchema = z.object({
   }),
 });
 
+// Update product validation schema (all fields optional)
+export const updateProductSchema = z.object({
+  params: z.object({
+    id: z
+      .string({
+        required_error: 'Product ID is required',
+      })
+      .regex(/^\d+$/, 'Product ID must be a valid number'),
+  }),
+  body: z.object({
+    name: z
+      .string({
+        invalid_type_error: 'Product name must be a string',
+      })
+      .min(2, 'Product name must be at least 2 characters')
+      .max(200, 'Product name must not exceed 200 characters')
+      .trim()
+      .optional(),
+    description: z
+      .string({
+        invalid_type_error: 'Product description must be a string',
+      })
+      .min(10, 'Product description must be at least 10 characters')
+      .max(1000, 'Product description must not exceed 1000 characters')
+      .trim()
+      .optional(),
+    price: z
+      .number({
+        invalid_type_error: 'Price must be a number',
+      })
+      .positive('Price must be a positive number')
+      .max(1000000, 'Price must not exceed 1,000,000')
+      .optional(),
+    stock: z
+      .number({
+        invalid_type_error: 'Stock must be a number',
+      })
+      .int('Stock must be an integer')
+      .nonnegative('Stock cannot be negative')
+      .max(1000000, 'Stock must not exceed 1,000,000')
+      .optional(),
+  }),
+});
+
+// Get product by ID validation schema
+export const getProductByIdSchema = z.object({
+  params: z.object({
+    id: z
+      .string({
+        required_error: 'Product ID is required',
+      })
+      .regex(/^\d+$/, 'Product ID must be a valid number'),
+  }),
+});
+
+// List products with filters validation schema
+export const listProductsSchema = z.object({
+  query: z.object({
+    name: z.string().optional(),
+    minPrice: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/, 'minPrice must be a valid number')
+      .optional(),
+    maxPrice: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/, 'maxPrice must be a valid number')
+      .optional(),
+  }),
+});
+
+// Delete product validation schema
+export const deleteProductSchema = z.object({
+  params: z.object({
+    id: z
+      .string({
+        required_error: 'Product ID is required',
+      })
+      .regex(/^\d+$/, 'Product ID must be a valid number'),
+  }),
+});
+
 // Type exports for TypeScript
 export type CreateProductInput = z.infer<typeof createProductSchema>['body'];
+export type UpdateProductInput = z.infer<typeof updateProductSchema>['body'];
+export type GetProductByIdInput = z.infer<typeof getProductByIdSchema>['params'];
+export type ListProductsInput = z.infer<typeof listProductsSchema>['query'];
+export type DeleteProductInput = z.infer<typeof deleteProductSchema>['params'];

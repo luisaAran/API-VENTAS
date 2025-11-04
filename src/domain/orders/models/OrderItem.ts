@@ -12,6 +12,14 @@ export class OrderItem {
   product!: Product;
   @Column({ type: 'int' })
   quantity!: number;
-  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 12, 
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value)
+    }
+  })
   unitPrice!: number;
 }
