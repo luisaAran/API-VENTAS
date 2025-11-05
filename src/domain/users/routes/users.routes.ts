@@ -6,7 +6,7 @@ import { AuthService } from '../../auth/services/auth.service';
 import { asyncHandler } from '../../../shared/utils/asyncHandler';
 import { requireAuth } from '../../../shared/middlewares/auth';
 import { validateZod } from '../../../shared/middlewares/validateZod';
-import { addBalanceSchema } from '../validations/users.validations';
+import { addBalanceSchema, updateUserSchema, deleteUserSchema } from '../validations/users.validations';
 
 export class UsersRoutes {
   public readonly router: Router;
@@ -45,6 +45,22 @@ export class UsersRoutes {
       '/',
       requireAuth(['admin']),
       asyncHandler(this.controller.listUsers.bind(this.controller))
+    );
+
+    // Update user (Admin only)
+    this.router.put(
+      '/:id',
+      requireAuth(['admin']),
+      validateZod(updateUserSchema),
+      asyncHandler(this.controller.updateUser.bind(this.controller))
+    );
+
+    // Delete user (Admin only) - CASCADE deletes all orders and order items
+    this.router.delete(
+      '/:id',
+      requireAuth(['admin']),
+      validateZod(deleteUserSchema),
+      asyncHandler(this.controller.deleteUser.bind(this.controller))
     );
   }
 }

@@ -39,6 +39,6 @@ export class User {
   @Column({ default: true })
   notifyBalanceUpdates!: boolean;
 
-  @OneToMany(() => Order, (order) => order.user)
+  @OneToMany(() => Order, (order) => order.user, { cascade: true, onDelete: 'CASCADE' })
   orders!: Order[];
 }

@@ -26,5 +26,32 @@ export const updateNotificationPreferencesSchema = z.object({
   }),
 });
 
+export const updateUserSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'ID must be a number'),
+  }),
+  body: z.object({
+    name: z.string().min(2, 'Name must be at least 2 characters').max(100).optional(),
+    email: z.string().email('Invalid email format').optional(),
+    balance: z
+      .number()
+      .nonnegative('Balance cannot be negative')
+      .max(999_000_000, 'Maximum balance is $999,000,000')
+      .optional(),
+    notifyBalanceUpdates: z.boolean().optional(),
+  }).refine(
+    (data) => Object.keys(data).length > 0,
+    'At least one field must be provided for update'
+  ),
+});
+
+export const deleteUserSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^\d+$/, 'ID must be a number'),
+  }),
+});
+
 export type AddBalanceInput = z.infer<typeof addBalanceSchema>['body'];
 export type UpdateNotificationPreferencesInput = z.infer<typeof updateNotificationPreferencesSchema>['body'];
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type DeleteUserInput = z.infer<typeof deleteUserSchema>;
