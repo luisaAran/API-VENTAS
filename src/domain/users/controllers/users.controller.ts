@@ -115,4 +115,56 @@ export class UsersController {
       },
     });
   }
+
+  /**
+   * Update user (Admin only)
+   * Admins can update user's name, email, balance, and notification preferences
+   * Note: Role cannot be updated through this endpoint (excluded from validation schema)
+   */
+  async updateUser(req: Request, res: Response) {
+    const userId = parseInt(req.params.id);
+    const { name, email, balance, notifyBalanceUpdates } = req.body as {
+      name?: string;
+      email?: string;
+      balance?: number;
+      notifyBalanceUpdates?: boolean;
+    };
+
+    const updatedUser = await this.usersService.updateUser(userId, {
+      name,
+      email,
+      balance,
+      notifyBalanceUpdates,
+    });
+
+    return res.json({
+      message: 'User updated successfully',
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        balance: updatedUser.balance,
+        role: updatedUser.role,
+        emailVerified: updatedUser.emailVerified,
+        notifyBalanceUpdates: updatedUser.notifyBalanceUpdates,
+      },
+    });
+  }
+
+  /**
+   * Delete user (Admin only)
+   * Uses CASCADE delete to remove all related orders and order items
+   * Prevents admin from deleting themselves or other admins
+   */
+  async deleteUser(req: Request, res: Response) {
+    const userId = parseInt(req.params.id);
+    const adminId = req.user!.userId; // ID of the admin performing the deletion
+    
+    await this.usersService.deleteUser(userId, adminId);
+    
+    return res.json({
+      ok: true,
+      message: 'User deleted successfully (including all orders and order items)',
+    });
+  }
 }

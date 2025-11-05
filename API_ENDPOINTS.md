@@ -764,7 +764,167 @@ El usuario recibe un email HTML con:
 
 ---
 
-## �🛒 Orders Endpoints (`/api/orders`)
+### 3. Update User (Admin Only)
+Permite a los administradores actualizar la información de cualquier usuario, incluyendo nombre, email, balance y preferencias de notificación. **Solo ADMINS**. 
+
+⚠️ **Nota**: El campo `role` NO puede ser actualizado a través de este endpoint (está excluido del esquema de validación).
+
+**Endpoint:** `PUT /api/users/:id`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID del usuario a actualizar
+
+**Request Body (todos los campos opcionales):**
+```json
+{
+  "name": "Juan Pérez Actualizado",
+  "email": "nuevo-email@example.com",
+  "balance": 1500.00,
+  "notifyBalanceUpdates": false
+}
+```
+
+**Validation Rules:**
+- `name`: 2-100 caracteres, opcional
+- `email`: Formato email válido, opcional (verifica que no esté en uso por otro usuario)
+- `balance`: Número no negativo, máximo $999,000,000, opcional
+- `notifyBalanceUpdates`: Boolean, opcional
+- **Al menos un campo debe ser proporcionado**
+- ❌ **`role` no está permitido**: Si se envía este campo, será ignorado por el esquema de validación
+
+**Success Response (200):**
+```json
+{
+  "message": "User updated successfully",
+  "user": {
+    "id": 1,
+    "name": "Juan Pérez Actualizado",
+    "email": "nuevo-email@example.com",
+    "balance": 1500.00,
+    "role": "user",
+    "emailVerified": true,
+    "notifyBalanceUpdates": false
+  }
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: Datos inválidos o ningún campo proporcionado
+- `404 NOT_FOUND`: Usuario no encontrado
+- `409 CONFLICT`: Email ya está en uso por otro usuario
+- `500 INTERNAL_ERROR`: Error al actualizar usuario
+
+**Notes:**
+- � **El rol NO puede ser actualizado** a través de este endpoint (por seguridad y simplicidad)
+- Si necesitas cambiar roles, considera crear un endpoint separado como `PATCH /api/users/:id/role`
+- El email se valida para evitar duplicados
+- Se invalida el caché de Redis automáticamente al actualizar
+- El balance puede ser ajustado directamente (útil para correcciones administrativas)
+
+**Examples:**
+
+✅ **Admin actualiza nombre y balance de un usuario:**
+```bash
+PUT /api/users/3
+{
+  "name": "Nuevo Nombre",
+  "balance": 500.00
+}
+
+Response: 200 OK
+```
+
+❌ **Intentar enviar `role` en el body (será rechazado por validación):**
+```bash
+PUT /api/users/3
+{
+  "name": "Nuevo Nombre",
+  "role": "admin"  # ← Este campo no es reconocido por el esquema
+}
+
+Response: 400 VALIDATION_ERROR (campo desconocido)
+```
+
+---
+
+### 4. Delete User (Admin Only)
+Elimina un usuario y **todas sus órdenes y order items** mediante CASCADE DELETE. **Solo ADMINS**. ⚠️ Esta operación es **irreversible**.
+
+**Endpoint:** `DELETE /api/users/:id`
+
+**Authentication:** Requiere cookies con `accessToken` o `refreshToken` válidos. Roles permitidos: `admin`.
+
+**URL Parameters:**
+- `id` (number, required): ID del usuario a eliminar
+
+**Success Response (200):**
+```json
+{
+  "ok": true,
+  "message": "User deleted successfully (including all orders and order items)"
+}
+```
+
+**Error Responses:**
+- `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
+- `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
+- `400 VALIDATION_ERROR`: ID inválido
+- `400 VALIDATION_ERROR`: Intentando eliminar su propia cuenta ("You cannot delete your own account")
+- `400 VALIDATION_ERROR`: Intentando eliminar otro admin ("Cannot delete another admin account. Demote to user first.")
+- `404 NOT_FOUND`: Usuario no encontrado
+- `500 INTERNAL_ERROR`: Error al eliminar usuario
+
+**Cascade Behavior:**
+```
+User (DELETE)
+  └─► Orders (CASCADE DELETE)
+       └─► OrderItems (CASCADE DELETE)
+```
+
+**What gets deleted:**
+1. **User** record
+2. **All Orders** associated with that user
+3. **All OrderItems** associated with those orders
+
+**What remains intact:**
+- **Products** (OrderItem → Product uses `RESTRICT`, but parent Order is deleted so no conflict)
+- **Other users** and their data
+
+**Security Validations:**
+- 🔒 **Cannot delete self**: Admin no puede eliminar su propia cuenta (previene bloqueo accidental)
+- 🔒 **Cannot delete other admins**: Solo se pueden eliminar usuarios con rol `user`
+- 💡 **Workaround**: Para eliminar un admin, primero cambiar su rol a `user` usando `PUT /api/users/:id`
+
+**Notes:**
+- ⚠️ **IRREVERSIBLE**: No hay confirmación adicional, el usuario y todo su historial se eliminan permanentemente
+- 🗑️ **Historial perdido**: Todas las órdenes del usuario se pierden
+- 💡 **Recomendación**: Considerar implementar **Soft Delete** para producción (marcar como eliminado sin borrar)
+- 🔒 **Cache**: Se invalida automáticamente el caché de Redis del usuario eliminado
+
+**Use Cases:**
+- Eliminar cuentas de prueba
+- Cumplir con solicitudes de eliminación de datos (GDPR)
+- Limpiar usuarios spam o fraudulentos
+
+**Example Flow to Delete an Admin:**
+```bash
+# 1. First, demote admin to user
+PUT /api/users/5
+{
+  "role": "user"
+}
+
+# 2. Then delete the user
+DELETE /api/users/5
+```
+
+---
+
+## 🛒 Orders Endpoints (`/api/orders`)
 
 ### 1. Create Order
 Crea una nueva orden de compra con **verificación de pago por email**. **Requiere autenticación** - usuarios y admins pueden crear órdenes. El sistema valida balance del usuario y stock disponible, pero NO descuenta hasta verificar el pago.

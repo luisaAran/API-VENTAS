@@ -125,4 +125,64 @@ export class UsersService {
       notifyBalanceUpdates: user.notifyBalanceUpdates,
     };
   }
+
+  /**
+   * Update user (Admin only)
+   * Can update name, email, balance, and notification preferences
+   * Note: Role field is excluded from the update schema for security
+   * @param userId - ID of the user to update
+   * @param updates - Fields to update (role excluded from validation)
+   */
+  async updateUser(
+    userId: number,
+    updates: {
+      name?: string;
+      email?: string;
+      balance?: number;
+      notifyBalanceUpdates?: boolean;
+    }
+  ): Promise<User> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User');
+
+    // If email is being updated, check for conflicts
+    if (updates.email && updates.email !== user.email) {
+      const existing = await this.userRepository.findByEmail(updates.email);
+      if (existing) throw new ConflictError('Email already in use');
+    }
+
+    // Update fields if provided
+    if (updates.name !== undefined) user.name = updates.name;
+    if (updates.email !== undefined) user.email = updates.email;
+    if (updates.balance !== undefined) user.balance = updates.balance;
+    if (updates.notifyBalanceUpdates !== undefined) {
+      user.notifyBalanceUpdates = updates.notifyBalanceUpdates;
+    }
+
+    return await this.userRepository.saveUser(user);
+  }
+
+  /**
+   * Delete user (Admin only)
+   * Uses CASCADE delete to remove all related orders and order items
+   * @param userId - ID of the user to delete
+   * @param adminId - ID of the admin performing the deletion
+   * @throws ValidationError if trying to delete self or another admin
+   */
+  async deleteUser(userId: number, adminId: number): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User');
+
+    // Prevent admin from deleting themselves
+    if (userId === adminId) {
+      throw new ValidationError('You cannot delete your own account');
+    }
+
+    // Prevent deleting other admins
+    if (user.role === 'admin') {
+      throw new ValidationError('Cannot delete another admin account. Demote to user first.');
+    }
+
+    await this.userRepository.deleteUser(userId);
+  }
 }

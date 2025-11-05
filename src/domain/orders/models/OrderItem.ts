@@ -6,9 +6,9 @@ import { Product } from '../../products/models/Product';
 export class OrderItem {
   @PrimaryGeneratedColumn()
   id!: number;
-  @ManyToOne(() => Order, (order) => order.items)
+  @ManyToOne(() => Order, (order) => order.items, { onDelete: 'CASCADE' })
   order!: Order;
-  @ManyToOne(() => Product)
+  @ManyToOne(() => Product, { onDelete: 'RESTRICT' })
   product!: Product;
   @Column({ type: 'int' })
   quantity!: number;
