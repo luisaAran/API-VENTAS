@@ -125,6 +125,51 @@ export class OrdersService {
       await this.checkAndCleanupOutOfStockProducts(productsArray, order.id);
       
       const createdOrder = await this.orderRepository.findOrderById(order.id);
+      
+      // Get updated user balance
+      const updatedUser = await this.usersService.findById(userId);
+      if (!updatedUser) {
+        throw new NotFoundError('User');
+      }
+
+      // Send invoice email with PDF attachment
+      try {
+        // Generate PDF invoice
+        const pdfBuffer = await PDFGenerator.generateInvoice(createdOrder!);
+
+        // Get email HTML template
+        const html = EmailTemplates.orderCompleted(
+          user.name,
+          createdOrder!.id,
+          new Date(createdOrder!.createdAt).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }),
+          createdOrder!.total.toFixed(2),
+          updatedUser.balance.toFixed(2)
+        );
+
+        // Queue email with PDF attachment
+        await queueEmail({
+          to: user.email,
+          subject: `¡Gracias por tu compra! - Orden #${createdOrder!.id}`,
+          html,
+          text: `Gracias por tu compra. Tu orden #${createdOrder!.id} ha sido completada exitosamente.`,
+          attachments: [
+            {
+              filename: `Factura-${createdOrder!.id}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+        });
+        logger.info(`Invoice email queued for ${user.email} for order #${createdOrder!.id}`);
+      } catch (emailError) {
+        // Log error but don't fail the order completion
+        logger.error(`Failed to send invoice email for order #${createdOrder!.id}:`, emailError);
+      }
+      
       return { order: createdOrder, requiresVerification: false };
     }
     const order = await this.orderRepository.createOrder({

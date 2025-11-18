@@ -151,21 +151,19 @@ export const createCartRouter = (controller: CartController): Router => {
    *     tags: [Cart]
    *     security:
    *       - cookieAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - productId
-   *             properties:
-   *               productId:
-   *                 type: integer
-   *                 example: 1
+   *     parameters:
+   *       - in: query
+   *         name: productId
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: ID del producto a eliminar
+   *         example: 1
    *     responses:
    *       200:
    *         description: Producto eliminado del carrito
+   *       400:
+   *         $ref: '#/components/responses/ValidationError'
    *       401:
    *         $ref: '#/components/responses/UnauthorizedError'
    */
