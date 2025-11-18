@@ -24,8 +24,9 @@ export class Order {
   total!: number;
   @Column({ type: 'enum', enum: ['pending', 'completed', 'cancelled'], default: 'pending' })
   status!: 'pending' | 'completed' | 'cancelled';
-  @ManyToOne(() => User, (user) => user.orders, { onDelete: 'CASCADE' })
-  user!: User;
+  // Change to SET NULL to preserve order history when user is soft deleted
+  @ManyToOne(() => User, (user) => user.orders, { onDelete: 'SET NULL', nullable: true })
+  user!: User | null;
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true, eager: true })
   items!: OrderItem[];
 }

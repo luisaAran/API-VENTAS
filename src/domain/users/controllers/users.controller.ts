@@ -3,7 +3,7 @@ import { UsersService } from '../services/users.service';
 import { ProductsService } from '../../products/services/products.service';
 import { AuthService } from '../../auth/services/auth.service';
 import { EmailTemplates, ProductSuggestion } from '../../../shared/templates';
-import { sendMail } from '../../../shared/utils/mailer';
+import { queueEmail } from '../../../shared/queues/email.queue';
 
 export class UsersController {
   constructor(
@@ -64,12 +64,12 @@ export class UsersController {
         productSuggestions
       );
       
-      await sendMail(
-        user.email,
-        '💰 Balance Added Successfully',
+      await queueEmail({
+        to: user.email,
+        subject: '💰 Balance Added Successfully',
         html,
-        `Your balance has been updated. New balance: $${user.balance.toFixed(2)}`
-      );
+        text: `Your balance has been updated. New balance: $${user.balance.toFixed(2)}`,
+      });
     }
     
     return res.json({
@@ -152,8 +152,8 @@ export class UsersController {
   }
 
   /**
-   * Delete user (Admin only)
-   * Uses CASCADE delete to remove all related orders and order items
+   * Delete user (Admin only) - Soft Delete
+   * Marks user as deleted while preserving order history for compliance
    * Prevents admin from deleting themselves or other admins
    */
   async deleteUser(req: Request, res: Response) {
@@ -164,7 +164,7 @@ export class UsersController {
     
     return res.json({
       ok: true,
-      message: 'User deleted successfully (including all orders and order items)',
+      message: 'User deleted successfully (soft delete - order history preserved)',
     });
   }
 }

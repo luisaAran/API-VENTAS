@@ -163,15 +163,24 @@ export class UsersService {
   }
 
   /**
-   * Delete user (Admin only)
-   * Uses CASCADE delete to remove all related orders and order items
+   * Delete user (Admin only) - Soft Delete
+   * Marks user as deleted while preserving order history for compliance
+   * User data remains in database but becomes inaccessible for authentication and operations
    * @param userId - ID of the user to delete
    * @param adminId - ID of the admin performing the deletion
    * @throws ValidationError if trying to delete self or another admin
    */
   async deleteUser(userId: number, adminId: number): Promise<void> {
-    const user = await this.userRepository.findById(userId);
+    // Note: We need to query directly without isDeleted filter to check the user's role
+    const userRepo = this.userRepository['userRepo'];
+    const user = await userRepo.findOne({ where: { id: userId } });
+    
     if (!user) throw new NotFoundError('User');
+
+    // Check if already deleted
+    if (user.isDeleted) {
+      throw new ValidationError('User is already deleted');
+    }
 
     // Prevent admin from deleting themselves
     if (userId === adminId) {
@@ -183,6 +192,7 @@ export class UsersService {
       throw new ValidationError('Cannot delete another admin account. Demote to user first.');
     }
 
+    // Soft delete: marks user as deleted, preserves data
     await this.userRepository.deleteUser(userId);
   }
 }

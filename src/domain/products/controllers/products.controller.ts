@@ -11,17 +11,29 @@ export class ProductsController {
   }
 
   async listProducts(req: Request, res: Response) {
-    // Extract query params for filtering
-    const { name, minPrice, maxPrice } = req.query as { name?: string; minPrice?: string; maxPrice?: string };
+    // Query params are already validated and transformed by Zod middleware
+    const { name, search, minPrice, maxPrice, inStock, page, limit } = req.query as { 
+      name?: string;
+      search?: string;
+      minPrice?: number; 
+      maxPrice?: number;
+      inStock?: boolean;
+      page?: number;
+      limit?: number;
+    };
     
     const filters = {
       name,
-      minPrice: minPrice ? parseFloat(minPrice) : undefined,
-      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+      search,
+      minPrice,
+      maxPrice,
+      inStock,
+      page,
+      limit,
     };
     
-    const products = await this.productsService.listProducts(filters);
-    return res.json(products);
+    const result = await this.productsService.listProducts(filters);
+    return res.json(result);
   }
 
   async getProductById(req: Request, res: Response) {

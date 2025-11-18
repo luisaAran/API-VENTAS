@@ -1,6 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 import { AuthModule, setOrdersService } from './domain/auth';
 import { UsersModule, setAuthService } from './domain/users';
 import { ProductsModule } from './domain/products';
@@ -12,6 +13,7 @@ import { initOrderExpirationWorker } from './shared/queues/orderExpiration.queue
 import { initEmailWorker } from './shared/queues/email.queue';
 import { initCartCleanupWorker } from './shared/queues/cartCleanup.queue';
 import { bullBoardRouter } from './shared/config/bullBoard';
+import { swaggerSpec } from './shared/config/swagger';
 
 // Inject OrdersService into AuthService to avoid circular dependency
 setOrdersService(OrdersModule.service);
@@ -31,6 +33,12 @@ app.use(requestLogger); // Log all incoming requests
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(logRequestBody); // Log request body (sanitized)
+
+// Swagger API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Ventas E-commerce API'
+}));
 
 // Routes
 app.use('/api/auth', AuthModule.router);

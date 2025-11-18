@@ -30,7 +30,8 @@ export class UserRepository {
       return cached;
     }
     logger.debug(`Cache MISS: ${cacheKey}`);
-    const user = await this.userRepo.findOne({ where: { email } });
+    // Filter out soft deleted users
+    const user = await this.userRepo.findOne({ where: { email, isDeleted: false } });
     if (user) {
       await this.cacheUser(user);
     }
@@ -44,7 +45,8 @@ export class UserRepository {
    */
   async findByEmailWithPassword(email: string): Promise<User | null> {
     logger.debug(`Auth query (bypass cache): ${email}`);
-    return await this.userRepo.findOne({ where: { email } });
+    // Filter out soft deleted users
+    return await this.userRepo.findOne({ where: { email, isDeleted: false } });
   }
 
   async findById(id: number): Promise<User | null> {
@@ -59,7 +61,8 @@ export class UserRepository {
       return cached;
     }
     logger.debug(`Cache MISS: ${cacheKey}`);
-    const user = await this.userRepo.findOne({ where: { id } });
+    // Filter out soft deleted users
+    const user = await this.userRepo.findOne({ where: { id, isDeleted: false } });
     if (user) {
       await this.cacheUser(user);
     }
@@ -97,8 +100,9 @@ export class UserRepository {
       return cached;
     }
     logger.debug(`Cache MISS: ${cacheKey}`);
+    // Filter out soft deleted users
     const user = await this.userRepo.findOne({
-      where: { id },
+      where: { id, isDeleted: false },
       relations: ['orders', 'orders.items', 'orders.items.product'],
       select: ['id', 'name', 'email', 'balance', 'emailVerified', 'role'],
     });
@@ -110,7 +114,9 @@ export class UserRepository {
   }
 
   async findAll(): Promise<User[]> {
+    // Filter out soft deleted users
     return await this.userRepo.find({
+      where: { isDeleted: false },
       select: ['id', 'name', 'email', 'balance', 'emailVerified', 'role'],
     });
   }
@@ -140,7 +146,28 @@ export class UserRepository {
     }
     return updatedUser;
   }
+  /**
+   * Soft delete a user (marks as deleted without removing from database)
+   * Preserves user data and order history for compliance and analytics
+   */
   async deleteUser(id: number): Promise<void> {
+    // Get user before soft deletion for cache invalidation
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (user) {
+      // Mark as deleted
+      user.isDeleted = true;
+      user.deletedAt = new Date();
+      await this.userRepo.save(user);
+      // Invalidate cache
+      await this.invalidateUserCache(id, user.email);
+    }
+  }
+
+  /**
+   * Permanently delete a user (physical deletion from database)
+   * WARNING: This is irreversible and should only be used for data cleanup or GDPR compliance
+   */
+  async permanentlyDeleteUser(id: number): Promise<void> {
     // Get user before deletion for cache invalidation
     const user = await this.userRepo.findOne({ where: { id } });
     await this.userRepo.delete(id);

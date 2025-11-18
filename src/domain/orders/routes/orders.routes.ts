@@ -25,7 +25,51 @@ export class OrdersRoutes {
   }
 
   private initializeRoutes() {
-    // CREATE - Both users and admins can create orders
+    /**
+     * @swagger
+     * /api/orders:
+     *   post:
+     *     summary: Crear nueva orden
+     *     tags: [Orders]
+     *     security:
+     *       - cookieAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - items
+     *             properties:
+     *               items:
+     *                 type: array
+     *                 items:
+     *                   type: object
+     *                   properties:
+     *                     productId:
+     *                       type: integer
+     *                       example: 1
+     *                     quantity:
+     *                       type: integer
+     *                       example: 2
+     *     responses:
+     *       201:
+     *         description: Orden creada - requiere verificación por email
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 message:
+     *                   type: string
+     *                 order:
+     *                   $ref: '#/components/schemas/Order'
+     *       400:
+     *         $ref: '#/components/responses/ValidationError'
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     */
     this.router.post(
       '/',
       requireAuth(['user', 'admin']),
@@ -33,7 +77,38 @@ export class OrdersRoutes {
       asyncHandler(this.controller.createOrder.bind(this.controller))
     );
 
-    // READ - Admins can see all orders with filters, users handled in /users/me endpoint
+    /**
+     * @swagger
+     * /api/orders:
+     *   get:
+     *     summary: Listar todas las órdenes (Solo Admin)
+     *     tags: [Orders]
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: query
+     *         name: status
+     *         schema:
+     *           type: string
+     *           enum: [pending, completed, cancelled]
+     *       - in: query
+     *         name: userId
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: Lista de órdenes
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 $ref: '#/components/schemas/Order'
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     *       403:
+     *         $ref: '#/components/responses/ForbiddenError'
+     */
     this.router.get(
       '/',
       requireAuth(['admin']),
@@ -41,6 +116,32 @@ export class OrdersRoutes {
       asyncHandler(this.controller.listAllOrders.bind(this.controller))
     );
 
+    /**
+     * @swagger
+     * /api/orders/{id}:
+     *   get:
+     *     summary: Obtener orden por ID
+     *     tags: [Orders]
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: Orden encontrada
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/Order'
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     *       404:
+     *         $ref: '#/components/responses/NotFoundError'
+     */
     this.router.get(
       '/:id',
       requireAuth(['user', 'admin']),
@@ -48,7 +149,39 @@ export class OrdersRoutes {
       asyncHandler(this.controller.getOrderById.bind(this.controller))
     );
 
-    // UPDATE - Only admins
+    /**
+     * @swagger
+     * /api/orders/{id}:
+     *   put:
+     *     summary: Actualizar orden (Solo Admin)
+     *     tags: [Orders]
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               status:
+     *                 type: string
+     *                 enum: [pending, completed, cancelled]
+     *     responses:
+     *       200:
+     *         description: Orden actualizada
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     *       403:
+     *         $ref: '#/components/responses/ForbiddenError'
+     *       404:
+     *         $ref: '#/components/responses/NotFoundError'
+     */
     this.router.put(
       '/:id',
       requireAuth(['admin']),
@@ -56,13 +189,66 @@ export class OrdersRoutes {
       asyncHandler(this.controller.updateOrder.bind(this.controller))
     );
 
-    // DELETE - Only admins
+    /**
+     * @swagger
+     * /api/orders/{id}:
+     *   delete:
+     *     summary: Eliminar orden (Solo Admin)
+     *     tags: [Orders]
+     *     security:
+     *       - cookieAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: Orden eliminada
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     *       403:
+     *         $ref: '#/components/responses/ForbiddenError'
+     *       404:
+     *         $ref: '#/components/responses/NotFoundError'
+     */
     this.router.delete(
       '/:id',
       requireAuth(['admin']),
       validateZod(deleteOrderSchema),
       asyncHandler(this.controller.deleteOrder.bind(this.controller))
     );
+    /**
+     * @swagger
+     * /api/orders/cancel:
+     *   post:
+     *     summary: Cancelar orden pendiente
+     *     tags: [Orders]
+     *     security:
+     *       - cookieAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - orderId
+     *             properties:
+     *               orderId:
+     *                 type: integer
+     *                 example: 1
+     *     responses:
+     *       200:
+     *         description: Orden cancelada exitosamente
+     *       400:
+     *         $ref: '#/components/responses/ValidationError'
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     *       404:
+     *         $ref: '#/components/responses/NotFoundError'
+     */
     this.router.post(
       '/cancel',
       requireAuth(['user', 'admin']),

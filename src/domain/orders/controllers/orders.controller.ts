@@ -45,7 +45,14 @@ export class OrdersController {
   }
   async getOrderById(req: Request, res: Response) {
     const { id } = req.params as { id: string };
-    const order = await this.ordersService.getOrderById(parseInt(id, 10));
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    
+    const order = await this.ordersService.getOrderById(
+      parseInt(id, 10), 
+      userId, 
+      role
+    );
     return res.json(order);
   }
   async updateOrder(req: Request, res: Response) {
