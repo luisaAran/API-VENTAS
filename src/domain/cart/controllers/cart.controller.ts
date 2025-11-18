@@ -48,7 +48,7 @@ export class CartController {
    */
   async removeItem(req: Request, res: Response) {
     const userId = req.user!.userId;
-    const { productId } = req.query as { productId: number };
+    const productId = Number(req.query.productId);
     const cart = await this.cartService.removeItem(userId, productId);
     return res.json(cart);
   }
