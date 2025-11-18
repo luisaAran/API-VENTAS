@@ -24,8 +24,11 @@ export const updateItemSchema = z.object({
  * Schema for removing item
  */
 export const removeItemSchema = z.object({
-  body: z.object({
-    productId: z.number().int().positive('Product ID must be a positive integer'),
+  query: z.object({
+    productId: z
+      .string()
+      .regex(/^\d+$/, 'Product ID must be a valid number')
+      .transform(Number),
   }),
 });
 

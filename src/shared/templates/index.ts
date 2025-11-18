@@ -143,7 +143,7 @@ export const EmailTemplates = {
           <div class="product-name">${product.name}</div>
           <div class="product-details">
             ID: #${product.id}
-            <span class="stock-badge">${product.stock} in stock</span>
+            <span class="stock-badge">${product.stock} disponibles</span>
           </div>
           <div class="product-price">$${product.price.toFixed(2)}</div>
         </div>
@@ -153,7 +153,7 @@ export const EmailTemplates = {
 
       productsSection = `
         <div class="products-section">
-          <div class="products-title">🛍️ You Might Be Interested In</div>
+          <div class="products-title">🛍️ Productos que podrían interesarte</div>
           ${productCards}
         </div>
       `;

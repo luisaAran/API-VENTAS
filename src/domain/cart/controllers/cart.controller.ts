@@ -44,11 +44,11 @@ export class CartController {
   }
   /**
    * Remove item from cart
-   * DELETE /api/cart/items
+   * DELETE /api/cart/items?productId=1
    */
   async removeItem(req: Request, res: Response) {
     const userId = req.user!.userId;
-    const { productId } = req.body as { productId: number };
+    const { productId } = req.query as { productId: number };
     const cart = await this.cartService.removeItem(userId, productId);
     return res.json(cart);
   }
