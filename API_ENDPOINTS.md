@@ -851,8 +851,8 @@ Response: 400 VALIDATION_ERROR (campo desconocido)
 
 ---
 
-### 4. Delete User (Admin Only)
-Elimina un usuario y **todas sus órdenes y order items** mediante CASCADE DELETE. **Solo ADMINS**. ⚠️ Esta operación es **irreversible**.
+### 4. Delete User (Admin Only) - Soft Delete
+Marca un usuario como eliminado **preservando su historial de órdenes** mediante Soft Delete. **Solo ADMINS**. ✅ Esta operación **puede revertirse** si es necesario.
 
 **Endpoint:** `DELETE /api/users/:id`
 
@@ -865,7 +865,7 @@ Elimina un usuario y **todas sus órdenes y order items** mediante CASCADE DELET
 ```json
 {
   "ok": true,
-  "message": "User deleted successfully (including all orders and order items)"
+  "message": "User deleted successfully (soft delete - order history preserved)"
 }
 ```
 
@@ -873,54 +873,60 @@ Elimina un usuario y **todas sus órdenes y order items** mediante CASCADE DELET
 - `401 AUTHENTICATION_ERROR`: Token faltante, inválido o expirado
 - `403 AUTHENTICATION_ERROR`: Permisos insuficientes (no es admin)
 - `400 VALIDATION_ERROR`: ID inválido
+- `400 VALIDATION_ERROR`: Usuario ya está eliminado ("User is already deleted")
 - `400 VALIDATION_ERROR`: Intentando eliminar su propia cuenta ("You cannot delete your own account")
 - `400 VALIDATION_ERROR`: Intentando eliminar otro admin ("Cannot delete another admin account. Demote to user first.")
 - `404 NOT_FOUND`: Usuario no encontrado
 - `500 INTERNAL_ERROR`: Error al eliminar usuario
 
-**Cascade Behavior:**
+**Soft Delete Behavior:**
 ```
-User (DELETE)
-  └─► Orders (CASCADE DELETE)
-       └─► OrderItems (CASCADE DELETE)
+User (SOFT DELETE)
+  ├─► isDeleted: true
+  ├─► deletedAt: timestamp
+  ├─► Cannot login
+  ├─► Hidden from user lists
+  └─► Orders preserved (SET NULL on user reference)
 ```
 
-**What gets deleted:**
-1. **User** record
-2. **All Orders** associated with that user
-3. **All OrderItems** associated with those orders
+**What happens:**
+1. **User** marcado como eliminado (`isDeleted: true`, `deletedAt: timestamp`)
+2. **Usuario ya no puede autenticarse** (filtrado en login)
+3. **No aparece en listados** de usuarios activos
+4. **Orders preservadas** con referencia a usuario en NULL
+5. **Historial de compras mantenido** para auditoría y compliance
 
 **What remains intact:**
-- **Products** (OrderItem → Product uses `RESTRICT`, but parent Order is deleted so no conflict)
-- **Other users** and their data
+- **Order history** (todas las órdenes del usuario se mantienen)
+- **OrderItems** (items de órdenes preservados)
+- **Products** (productos no afectados)
+- **User data** (nombre, email, etc. permanecen en base de datos)
 
 **Security Validations:**
 - 🔒 **Cannot delete self**: Admin no puede eliminar su propia cuenta (previene bloqueo accidental)
 - 🔒 **Cannot delete other admins**: Solo se pueden eliminar usuarios con rol `user`
-- 💡 **Workaround**: Para eliminar un admin, primero cambiar su rol a `user` usando `PUT /api/users/:id`
+- 🔒 **Cannot delete twice**: Previene eliminar un usuario ya eliminado
+- 💡 **Workaround**: Para eliminar un admin, primero cambiar su rol a `user` usando endpoint de actualización de roles
 
 **Notes:**
-- ⚠️ **IRREVERSIBLE**: No hay confirmación adicional, el usuario y todo su historial se eliminan permanentemente
-- 🗑️ **Historial perdido**: Todas las órdenes del usuario se pierden
-- 💡 **Recomendación**: Considerar implementar **Soft Delete** para producción (marcar como eliminado sin borrar)
+- ✅ **REVERSIBLE**: Soft delete permite recuperar el usuario si es necesario (modificando `isDeleted` y `deletedAt` en base de datos)
+- 📊 **Historial preservado**: Todas las órdenes del usuario se mantienen para análisis y compliance
+- 🔐 **GDPR Compliance**: Para eliminación permanente (right to be forgotten), usar borrado físico de base de datos directamente
 - 🔒 **Cache**: Se invalida automáticamente el caché de Redis del usuario eliminado
+- 🚫 **Login bloqueado**: Usuario eliminado no puede autenticarse (filtrado en `findByEmail`)
 
 **Use Cases:**
-- Eliminar cuentas de prueba
-- Cumplir con solicitudes de eliminación de datos (GDPR)
-- Limpiar usuarios spam o fraudulentos
+- Suspender cuentas temporalmente
+- Cumplir con políticas de retención de datos
+- Mantener integridad referencial del historial de ventas
+- Análisis de comportamiento de usuarios inactivos
 
-**Example Flow to Delete an Admin:**
-```bash
-# 1. First, demote admin to user
-PUT /api/users/5
-{
-  "role": "user"
-}
-
-# 2. Then delete the user
-DELETE /api/users/5
-```
+**Advantages over CASCADE DELETE:**
+- ✅ Preserva historial de órdenes para reportes
+- ✅ Permite análisis de ventas incluso de usuarios eliminados
+- ✅ Cumple con auditorías financieras
+- ✅ Datos pueden recuperarse si fue eliminación accidental
+- ✅ Compatible con regulaciones de retención de datos
 
 ---
 

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, DeleteDateColumn } from 'typeorm';
 import { Order } from '../../orders/models/Order';
 
 @Entity()
@@ -39,6 +39,14 @@ export class User {
   @Column({ default: true })
   notifyBalanceUpdates!: boolean;
 
-  @OneToMany(() => Order, (order) => order.user, { cascade: true, onDelete: 'CASCADE' })
+  // Soft delete fields
+  @DeleteDateColumn({ nullable: true })
+  deletedAt!: Date | null;
+
+  @Column({ default: false })
+  isDeleted!: boolean;
+
+  // Remove CASCADE delete - orders should remain for historical purposes
+  @OneToMany(() => Order, (order) => order.user)
   orders!: Order[];
 }

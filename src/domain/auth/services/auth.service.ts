@@ -80,14 +80,18 @@ export class AuthService {
       if (decoded.purpose !== 'email-verification') {
         throw new ValidationError('Invalid token purpose');
       }
-
+      const user = await this.usersService.findByEmail(decoded.email);
+      if (!user) throw new NotFoundError('User');
+      if (user.emailVerified) {
+        throw new ValidationError('Email already verified');
+      }
       await this.usersService.updateEmailVerification(decoded.email, true);
       return { ok: true, message: 'Email verified successfully' };
     } catch (error: any) {
       if (error.name === 'TokenExpiredError') {
         throw new AuthenticationError('Verification link expired');
       }
-      if (error instanceof ValidationError) {
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
         throw error;
       }
       throw new AuthenticationError('Invalid verification token');

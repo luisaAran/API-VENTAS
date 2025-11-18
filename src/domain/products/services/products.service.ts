@@ -12,21 +12,63 @@ export class ProductsService {
     return product;
   }
 
-  async listProducts(filters?: { name?: string; minPrice?: number; maxPrice?: number }) {
+  async listProducts(filters?: { 
+    name?: string;
+    search?: string;
+    minPrice?: number; 
+    maxPrice?: number; 
+    inStock?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
     const repo = AppDataSource.getRepository(Product);
     const queryBuilder = repo.createQueryBuilder('product');
+    
     // Apply filters if provided
     if (filters?.name) {
-      queryBuilder.andWhere('product.name LIKE :name', { name: `%${filters.name}%` });
+      queryBuilder.andWhere('LOWER(product.name) LIKE LOWER(:name)', { name: `%${filters.name}%` });
     }
+    
+    // Search filter (searches in name AND description)
+    if (filters?.search) {
+      queryBuilder.andWhere(
+        '(LOWER(product.name) LIKE LOWER(:search) OR LOWER(product.description) LIKE LOWER(:search))',
+        { search: `%${filters.search}%` }
+      );
+    }
+    
     if (filters?.minPrice !== undefined) {
       queryBuilder.andWhere('product.price >= :minPrice', { minPrice: filters.minPrice });
     }
     if (filters?.maxPrice !== undefined) {
       queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice: filters.maxPrice });
     }
-    const products = await queryBuilder.getMany();
-    return products;
+    if (filters?.inStock !== undefined) {
+      if (filters.inStock) {
+        queryBuilder.andWhere('product.stock > 0');
+      } else {
+        queryBuilder.andWhere('product.stock = 0');
+      }
+    }
+
+    // Pagination
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    queryBuilder.skip(skip).take(limit);
+
+    const [products, total] = await queryBuilder.getManyAndCount();
+    
+    return {
+      products,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 
   /**

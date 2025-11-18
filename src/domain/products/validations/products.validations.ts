@@ -96,13 +96,41 @@ export const getProductByIdSchema = z.object({
 export const listProductsSchema = z.object({
   query: z.object({
     name: z.string().optional(),
+    search: z
+      .string()
+      .min(1, 'search must be at least 1 character')
+      .optional(),
     minPrice: z
       .string()
       .regex(/^\d+(\.\d+)?$/, 'minPrice must be a valid number')
+      .transform(Number)
       .optional(),
     maxPrice: z
       .string()
       .regex(/^\d+(\.\d+)?$/, 'maxPrice must be a valid number')
+      .transform(Number)
+      .optional(),
+    inStock: z
+      .string()
+      .toLowerCase()
+      .refine((val) => val === 'true' || val === 'false', {
+        message: 'inStock must be true or false',
+      })
+      .transform((val) => val === 'true')
+      .optional(),
+    page: z
+      .string()
+      .regex(/^\d+$/, 'page must be a valid positive integer')
+      .transform(Number)
+      .refine((val) => val >= 1, { message: 'page must be at least 1' })
+      .optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/, 'limit must be a valid positive integer')
+      .transform(Number)
+      .refine((val) => val >= 1 && val <= 100, {
+        message: 'limit must be between 1 and 100',
+      })
       .optional(),
   }),
 });

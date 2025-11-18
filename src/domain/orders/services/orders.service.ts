@@ -184,11 +184,20 @@ export class OrdersService {
   }) {
     return await this.orderRepository.findAllOrdersWithFilters(filters);
   }
-  async getOrderById(orderId: number) {
+  async getOrderById(orderId: number, userId?: number, role?: string) {
     const order = await this.orderRepository.findOrderById(orderId);
     if (!order) {
       throw new NotFoundError('Order');
     }
+
+    // If user is not admin, verify ownership
+    if (userId && role === 'user') {
+      // If order has no user (soft deleted) or doesn't belong to requesting user
+      if (!order.user || order.user.id !== userId) {
+        throw new NotFoundError('Order');
+      }
+    }
+
     return order;
   }
   async getUserOrders(userId: number) {
@@ -207,7 +216,7 @@ export class OrdersService {
     }
 
     // Validate order belongs to user
-    if (order.user.id !== userId) {
+    if (order.user!.id !== userId) {
       throw new ValidationError('Order does not belong to user');
     }
 
@@ -270,7 +279,7 @@ export class OrdersService {
 
       // Get email HTML template
       const html = EmailTemplates.orderCompleted(
-        order.user.name,
+        order.user!.name,
         order.id,
         new Date(order.createdAt).toLocaleDateString('es-ES', {
           year: 'numeric',
@@ -283,7 +292,7 @@ export class OrdersService {
 
       // Queue email with PDF attachment
       await queueEmail({
-        to: order.user.email,
+        to: order.user!.email,
         subject: `¡Gracias por tu compra! - Orden #${order.id}`,
         html,
         text: `Gracias por tu compra. Tu orden #${order.id} ha sido completada exitosamente.`,
@@ -296,7 +305,7 @@ export class OrdersService {
         ],
       });
 
-      logger.info(`Invoice email queued for ${order.user.email} for order #${order.id}`);
+      logger.info(`Invoice email queued for ${order.user!.email} for order #${order.id}`);
     } catch (emailError) {
       // Log error but don't fail the order completion
       logger.error(`Failed to send invoice email for order #${order.id}:`, emailError);
@@ -380,7 +389,7 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundError('Order');
     }
-    if (order.user.id !== userId) {
+    if (order.user!.id !== userId) {
       throw new NotFoundError('Order');
     }
     if (order.status !== 'pending') {
